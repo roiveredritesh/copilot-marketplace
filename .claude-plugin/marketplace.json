@@ -1,86 +1,96 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "ritesh-marketplace",
+  "version": "2.0.0",
+  "description": "Local marketplace for Claude Code with 12 plugins, 43 agents, 43 commands, and 12 shared skills covering .NET/LINQ-to-SQL, database optimization, documentation, and modernization",
   "owner": {
     "name": "Ritesh Tak",
     "email": "ritesh@example.com"
   },
-  "metadata": {
-    "version": "2.0.0",
-    "description": "Local marketplace for Claude Code with 12 plugins, 43 agents, 43 commands, and 12 shared skills covering .NET/LINQ-to-SQL, database optimization, documentation, and modernization",
-    "pluginRoot": "../plugins"
-  },
   "plugins": [
     {
       "name": "analysis-toolkit",
-      "source": "analysis-toolkit",
       "version": "2.0.0",
-      "description": "Root cause analysis, error investigation, issue diagnosis, and QA testing guide generation with shared skills integration"
+      "description": "Root cause analysis, error investigation, issue diagnosis, and QA testing guide generation with shared skills integration",
+      "source": "./plugins/analysis-toolkit",
+      "category": "development"
     },
     {
       "name": "optimization-engine",
-      "source": "optimization-engine",
       "version": "2.0.0",
-      "description": "Database query and algorithm optimization with shared performance tuning strategies and skills"
+      "description": "Database query and algorithm optimization with shared performance tuning strategies and skills",
+      "source": "./plugins/optimization-engine",
+      "category": "development"
     },
     {
       "name": "review-suite",
-      "source": "review-suite",
       "version": "2.0.0",
-      "description": "Pull request and code review tools with shared skills integration"
+      "description": "Pull request and code review tools with shared skills integration",
+      "source": "./plugins/review-suite",
+      "category": "productivity"
     },
     {
       "name": "development-suite",
-      "source": "development-suite",
       "version": "2.0.0",
-      "description": "Code generation, debugging, and refactoring tools with LINQ-to-SQL and technical writing skills"
+      "description": "Code generation, debugging, and refactoring tools with LINQ-to-SQL and technical writing skills",
+      "source": "./plugins/development-suite",
+      "category": "development"
     },
     {
       "name": "architecture-advisor",
-      "source": "architecture-advisor",
       "version": "2.0.0",
-      "description": "Architecture analysis, design patterns, and .NET Framework modernization guidance"
+      "description": "Architecture analysis, design patterns, and .NET Framework modernization guidance",
+      "source": "./plugins/architecture-advisor",
+      "category": "development"
     },
     {
       "name": "planning-suite",
-      "source": "planning-suite",
       "version": "2.0.0",
-      "description": "Comprehensive planning toolkit for detailed execution plans with code-level changes and analysis integration"
+      "description": "Comprehensive planning toolkit for detailed execution plans with code-level changes and analysis integration",
+      "source": "./plugins/planning-suite",
+      "category": "productivity"
     },
     {
       "name": "brainstorming-suite",
-      "source": "brainstorming-suite",
       "version": "2.0.0",
-      "description": "Ideation and brainstorming tools for feature exploration and problem-solving"
+      "description": "Ideation and brainstorming tools for feature exploration and problem-solving",
+      "source": "./plugins/brainstorming-suite",
+      "category": "productivity"
     },
     {
       "name": "linq-to-sql-expert",
-      "source": "linq-to-sql-expert",
       "version": "2.0.0",
-      "description": "LINQ-to-SQL optimization, bug fixing, and SQL stored procedure migration for .NET Framework applications"
+      "description": "LINQ-to-SQL optimization, bug fixing, and SQL stored procedure migration for .NET Framework applications",
+      "source": "./plugins/linq-to-sql-expert",
+      "category": "development"
     },
     {
       "name": "root-cause-analyzer",
-      "source": "root-cause-analyzer",
       "version": "2.0.0",
-      "description": "Codebase-focused root cause analysis for bug patterns, regression identification, and error correlation"
+      "description": "Codebase-focused root cause analysis for bug patterns, regression identification, and error correlation",
+      "source": "./plugins/root-cause-analyzer",
+      "category": "development"
     },
     {
       "name": "database-schema-analyzer",
-      "source": "database-schema-analyzer",
       "version": "2.0.0",
-      "description": "SQL Server schema analysis, migration planning, relationship mapping, and normalization analysis"
+      "description": "SQL Server schema analysis, migration planning, relationship mapping, and normalization analysis",
+      "source": "./plugins/database-schema-analyzer",
+      "category": "development"
     },
     {
       "name": "confluence-document-creator",
-      "source": "confluence-document-creator",
       "version": "2.0.0",
-      "description": "Automated technical documentation generation for Confluence (API docs, architecture docs, runbooks, release notes)"
+      "description": "Automated technical documentation generation for Confluence (API docs, architecture docs, runbooks, release notes)",
+      "source": "./plugins/confluence-document-creator",
+      "category": "productivity"
     },
     {
       "name": "telerik-control-expert",
-      "source": "telerik-control-expert",
       "version": "2.0.0",
-      "description": "Telerik RadControls troubleshooting, migration to modern alternatives, and optimization for ASP.NET WebForms"
+      "description": "Telerik RadControls troubleshooting, migration to modern alternatives, and optimization for ASP.NET WebForms",
+      "source": "./plugins/telerik-control-expert",
+      "category": "development"
     }
   ]
 }
