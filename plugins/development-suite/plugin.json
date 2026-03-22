@@ -1,0 +1,11 @@
+{
+  "name": "development-suite",
+  "version": "2.0.0",
+  "description": "Code generation, debugging assistance, and refactoring guidance for development productivity",
+  "author": {
+    "name": "Ritesh Tak",
+    "email": "ritesh@example.com"
+  },
+  "license": "MIT",
+  "keywords": ["code-generation", "debugging", "refactoring", "development", "productivity"]
+}

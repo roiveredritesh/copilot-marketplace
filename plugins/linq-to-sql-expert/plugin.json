@@ -1,0 +1,11 @@
+{
+  "name": "linq-to-sql-expert",
+  "version": "2.0.0",
+  "description": "LINQ-to-SQL optimization, bug fixing, and SQL stored procedure migration for .NET Framework applications",
+  "author": {
+    "name": "Ritesh Tak",
+    "email": "ritesh@example.com"
+  },
+  "license": "MIT",
+  "keywords": ["linq-to-sql", "dotnet", "database", "migration", "optimization"]
+}

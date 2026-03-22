@@ -1,0 +1,11 @@
+{
+  "name": "analysis-toolkit",
+  "version": "2.0.0",
+  "description": "Root cause analysis, error investigation, issue diagnosis, and QA testing guide generation toolkit with shared skills integration",
+  "author": {
+    "name": "Ritesh Tak",
+    "email": "ritesh@example.com"
+  },
+  "license": "MIT",
+  "keywords": ["analysis", "root-cause", "debugging", "qa-testing", "error-investigation"]
+}

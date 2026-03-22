@@ -1,0 +1,11 @@
+{
+  "name": "planning-suite",
+  "version": "2.0.0",
+  "description": "Comprehensive planning toolkit for detailed execution plans with code-level changes and analysis integration",
+  "author": {
+    "name": "Ritesh Tak",
+    "email": "ritesh@example.com"
+  },
+  "license": "MIT",
+  "keywords": ["planning", "execution-plans", "task-breakdown", "analysis"]
+}

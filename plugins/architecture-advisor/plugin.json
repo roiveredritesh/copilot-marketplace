@@ -1,0 +1,11 @@
+{
+  "name": "architecture-advisor",
+  "version": "2.0.0",
+  "description": "Architecture analysis, design patterns, and .NET Framework modernization guidance",
+  "author": {
+    "name": "Ritesh Tak",
+    "email": "ritesh@example.com"
+  },
+  "license": "MIT",
+  "keywords": ["architecture", "design-patterns", "modernization", "dotnet", "system-design"]
+}
