@@ -7,7 +7,7 @@
   "metadata": {
     "version": "2.0.0",
     "description": "Local marketplace for Claude Code with 12 plugins, 43 agents, 43 commands, and 12 shared skills covering .NET/LINQ-to-SQL, database optimization, documentation, and modernization",
-    "pluginRoot": "./plugins"
+    "pluginRoot": "../plugins"
   },
   "plugins": [
     {
