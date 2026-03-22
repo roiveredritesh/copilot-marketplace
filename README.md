@@ -5,6 +5,12 @@ This repository is a local plugin marketplace for both GitHub Copilot CLI and Cl
 - Copilot CLI marketplace manifest: `marketplace.json`
 - Claude Code marketplace manifest: `.claude-plugin/marketplace.json`
 
+GitHub repository for this marketplace:
+
+```text
+roiveredritesh/copilot-marketplace
+```
+
 Important: a marketplace is only a catalog. Adding the marketplace does not install every plugin automatically. The documented flow for both tools is:
 
 1. Add the marketplace.
@@ -28,9 +34,9 @@ Important: a marketplace is only a catalog. Adding the marketplace does not inst
 
 ## Prerequisites
 
-1. Clone this repository to a stable local path.
-2. Keep the current folder structure unchanged.
-3. Use a recent version of GitHub Copilot CLI or Claude Code with plugin marketplace support enabled.
+1. Use a recent version of GitHub Copilot CLI or Claude Code with plugin marketplace support enabled.
+2. If you use the GitHub install flow, you do not need to clone this repository locally.
+3. If you use the local-path flow, keep the current folder structure unchanged.
 
 Example path used below:
 
@@ -46,21 +52,25 @@ GitHub’s documented marketplace flow for Copilot CLI is:
 2. Browse plugins in that marketplace.
 3. Install the specific plugin you want.
 
-### 1. Add This Marketplace
+### Install From GitHub Marketplace
+
+This is the preferred setup if you want to install from GitHub without cloning the repository.
+
+#### 1. Add This Marketplace From GitHub
 
 From PowerShell:
 
 ```powershell
-copilot plugin marketplace add D:\n8n\abc_marketplace
+copilot plugin marketplace add roiveredritesh/copilot-marketplace
 ```
 
 Or from an interactive Copilot session:
 
 ```text
-/plugin marketplace add D:\n8n\abc_marketplace
+/plugin marketplace add roiveredritesh/copilot-marketplace
 ```
 
-### 2. Confirm The Marketplace Was Added
+#### 2. Confirm The Marketplace Was Added
 
 ```powershell
 copilot plugin marketplace list
@@ -78,13 +88,13 @@ The marketplace name defined by this repository is:
 ritesh-marketplace
 ```
 
-### 3. Browse Available Plugins
+#### 3. Browse Available Plugins
 
 ```powershell
 copilot plugin marketplace browse ritesh-marketplace
 ```
 
-### 4. Install A Plugin
+#### 4. Install A Plugin
 
 Example:
 
@@ -100,7 +110,82 @@ copilot plugin install architecture-advisor@ritesh-marketplace
 copilot plugin install brainstorming-suite@ritesh-marketplace
 ```
 
-### 5. Manage Installed Plugins
+### Install A Copilot CLI Plugin Directly From GitHub
+
+Copilot CLI also supports installing a plugin directly from a repository path without first adding the marketplace.
+
+Example:
+
+```powershell
+copilot plugin install roiveredritesh/copilot-marketplace:plugins/analysis-toolkit
+```
+
+Additional examples:
+
+```powershell
+copilot plugin install roiveredritesh/copilot-marketplace:plugins/review-suite
+copilot plugin install roiveredritesh/copilot-marketplace:plugins/architecture-advisor
+```
+
+### Install From A Local Path Instead
+
+Use this only if you specifically want to install from a checked-out local copy.
+
+#### 1. Add This Marketplace
+
+From PowerShell:
+
+```powershell
+copilot plugin marketplace add D:\n8n\abc_marketplace
+```
+
+Or from an interactive Copilot session:
+
+```text
+/plugin marketplace add D:\n8n\abc_marketplace
+```
+
+#### 2. Confirm The Marketplace Was Added
+
+```powershell
+copilot plugin marketplace list
+```
+
+Or:
+
+```text
+/plugin marketplace list
+```
+
+The marketplace name defined by this repository is:
+
+```text
+ritesh-marketplace
+```
+
+#### 3. Browse Available Plugins
+
+```powershell
+copilot plugin marketplace browse ritesh-marketplace
+```
+
+#### 4. Install A Plugin
+
+Example:
+
+```powershell
+copilot plugin install analysis-toolkit@ritesh-marketplace
+```
+
+You can repeat that for any plugin in this repository, for example:
+
+```powershell
+copilot plugin install review-suite@ritesh-marketplace
+copilot plugin install architecture-advisor@ritesh-marketplace
+copilot plugin install brainstorming-suite@ritesh-marketplace
+```
+
+### Manage Installed Copilot CLI Plugins
 
 List installed plugins:
 
@@ -132,50 +217,21 @@ copilot plugin install .\plugins\analysis-toolkit
 
 Claude Code follows the same model: add the marketplace first, then install plugins individually.
 
-### Important Path Note For This Repository
+For this repository, the GitHub marketplace flow is the recommended setup. You do not need to clone the repository locally or prepare any local plugin paths when installing from GitHub.
 
-Claude Code expects plugin paths in `.claude-plugin/marketplace.json` to resolve relative to `.claude-plugin`. This manifest uses sources like:
+### Install From GitHub Marketplace
 
-```text
-./plugins/analysis-toolkit
-```
+This is the preferred setup if you want to install from GitHub without cloning the repository.
 
-Because this repository stores the real plugin folders in the root `plugins/` directory, you should create `.claude-plugin\plugins` junctions that point to those root folders before adding the marketplace locally.
-
-### 1. Prepare The Claude Plugin Paths
-
-Run this once in PowerShell:
-
-```powershell
-$repoRoot = 'D:\n8n\abc_marketplace'
-$sourceRoot = Join-Path $repoRoot 'plugins'
-$claudePlugins = Join-Path $repoRoot '.claude-plugin\plugins'
-
-New-Item -ItemType Directory -Path $claudePlugins -Force | Out-Null
-
-Get-ChildItem -Path $sourceRoot -Directory | ForEach-Object {
-    $target = Join-Path $claudePlugins $_.Name
-    if (-not (Test-Path $target)) {
-        New-Item -ItemType Junction -Path $target -Target $_.FullName | Out-Null
-    }
-}
-```
-
-### 2. Add This Marketplace
+#### 1. Add This Marketplace From GitHub
 
 From Claude Code:
 
 ```text
-/plugin marketplace add D:\n8n\abc_marketplace
+/plugin marketplace add roiveredritesh/copilot-marketplace
 ```
 
-Claude Code also supports adding a direct marketplace file path. For this repository, that is:
-
-```text
-D:\n8n\abc_marketplace\.claude-plugin\marketplace.json
-```
-
-### 3. Open The Plugin Manager Or List Marketplaces
+#### 2. Open The Plugin Manager Or List Marketplaces
 
 Use the interactive manager:
 
@@ -189,7 +245,13 @@ Or list marketplaces directly:
 /plugin marketplace list
 ```
 
-### 4. Install A Plugin
+The marketplace name defined by this repository is:
+
+```text
+ritesh-marketplace
+```
+
+#### 3. Install A Plugin
 
 Example:
 
@@ -211,7 +273,7 @@ If you install through the `/plugin` UI, Claude Code lets you choose the install
 - Project scope
 - Local scope
 
-### 5. Reload Plugins
+#### 4. Reload Plugins
 
 After installing, enabling, or disabling plugins, reload them without restarting:
 
@@ -219,7 +281,7 @@ After installing, enabling, or disabling plugins, reload them without restarting
 /reload-plugins
 ```
 
-### 6. Manage Installed Plugins
+### Manage Installed Claude Code Plugins
 
 Disable a plugin:
 
@@ -267,15 +329,16 @@ Examples:
 ### Copilot CLI Marketplace Problems
 
 1. Run `copilot plugin marketplace list` and confirm `ritesh-marketplace` exists.
-2. Make sure you added the repository directory, not a random parent folder.
-3. Keep `marketplace.json` beside the root `plugins/` directory.
+2. If using GitHub install, make sure you added `roiveredritesh/copilot-marketplace`.
+3. If using local install, make sure you added the repository directory, not a random parent folder.
+4. Keep `marketplace.json` beside the root `plugins/` directory for local-path installs.
 
 ### Claude Code Marketplace Problems
 
 1. Run `/plugin marketplace list` and confirm `ritesh-marketplace` exists.
-2. Make sure `.claude-plugin/marketplace.json` is present.
-3. Make sure `.claude-plugin\plugins\<plugin-name>` exists for each plugin you want Claude Code to install.
-4. Run `/reload-plugins` after install or configuration changes.
+2. If using GitHub install, make sure you added `roiveredritesh/copilot-marketplace`.
+3. Run `/reload-plugins` after install or configuration changes.
+4. If installation fails, verify the repository is accessible and that `.claude-plugin/marketplace.json` exists in the GitHub repository.
 
 ### Plugin Does Not Appear
 
@@ -289,8 +352,7 @@ Examples:
 abc_marketplace/
 |-- marketplace.json
 |-- .claude-plugin/
-|   |-- marketplace.json
-|   \-- plugins/                # Junctions for Claude Code plugin sources
+|   \-- marketplace.json
 \-- plugins/
     |-- analysis-toolkit/
     |-- architecture-advisor/
