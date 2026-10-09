@@ -1,0 +1,9 @@
+{
+  "name": "sqlserver",
+  "version": "3.0.0",
+  "description": "SQL Server live schema audit with fix migrations (EF Core or SQL) and migration safety review, through read-only sqlcmd work orders run by a Haiku runner.",
+  "author": { "name": "Ritesh Tak" },
+  "license": "MIT",
+  "keywords": ["sqlserver", "mssql", "efcore", "schema", "migrations"],
+  "dependencies": ["core"]
+}

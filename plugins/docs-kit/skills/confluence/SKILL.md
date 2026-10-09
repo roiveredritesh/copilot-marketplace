@@ -1,7 +1,7 @@
 ---
 name: confluence
-description: Create or update a Confluence page (API doc, ADR, runbook, release notes, QA test guide) from the codebase; the page is published by the isolated Haiku publisher agent.
-argument-hint: "<api|adr|runbook|release-notes|qa-guide> <space-key or page URL/id> [parent page id] [topic]"
+description: Create or update a Confluence page (API doc, ADR, runbook, release notes, QA test guide, spike report, ticket findings) from the codebase or an existing report; the page is published by the isolated Haiku publisher agent.
+argument-hint: "<api|adr|runbook|release-notes|qa-guide|spike|findings> <space-key or page URL/id> [parent page id] [topic | report file | ISSUE-KEY]"
 disable-model-invocation: true
 ---
 # Publish a Confluence page
@@ -18,6 +18,8 @@ From the arguments: doc type, target (a space key + optional parent id for a new
 | adr | none, unless the decision references code: `core:scout` for the affected components |
 | runbook | `core:scout`: "scope: <host project dir>, appsettings*.json, Program.cs. List config keys (appsettings*, env vars), health check endpoints, background services, external dependencies (connection strings/HttpClient names), with path:line" |
 | release-notes | `core:runner` with the two commands below (at most 80 lines) |
+| spike | none: the content is an existing spike result (a `.reports/spike-*.md` file or a `/dotnet:spike` report in this conversation). If there is none, stop and suggest `/dotnet:spike <question> --save` first. Don't redo the research here |
+| findings | `publisher`: fetch the ticket (key, summary, type, status, priority, links) using the work order in `${CLAUDE_PLUGIN_ROOT}/skills/jira/SKILL.md`. The findings come from an existing report (`.reports/debug-*.md`, `.reports/analysis-*.md`, or the conversation). If there is none, stop and suggest `/dotnet:debug` (bug) or `/dotnet:analyze` (story) first |
 | qa-guide | `core:scout`: "scope: <dirs of the feature> | terms: <page/endpoint/type names>. For the feature: UI inputs and validators (client and server, DataAnnotations), workflow branches and error paths, DB constraints that reject input, with path:line; at most 80 lines" |
 
 Release-notes commands (the second one only when `gh` is authenticated):

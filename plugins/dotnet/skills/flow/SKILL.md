@@ -1,6 +1,6 @@
 ---
 name: flow
-description: Spec-driven SDLC in one command - analyze, (spike), plan, implement, (tests), review, pr, (PR comments) - with an approval gate after every step and a resumable spec folder per ticket.
+description: Spec-driven SDLC in one command - (brainstorm), analyze, (spike), plan, implement, (tests), review, pr, (PR comments) - with an approval gate after every step and a resumable spec folder per ticket.
 argument-hint: "<ISSUE-KEY | details> [--no-tdd] | resume <KEY or slug> | status <KEY or slug>"
 disable-model-invocation: true
 ---
@@ -16,6 +16,7 @@ Runs the SDLC skills of this plugin in order. You stop for the user's approval a
   ```
   # Flow <KEY>: <summary>
   mode: tdd | code-first
+  - [ ] brainstorm - skipped | pending
   - [x] analyze - approved <yyyy-mm-dd>
   - [ ] spike - skipped | pending
   - [ ] plan
@@ -30,6 +31,7 @@ Runs the SDLC skills of this plugin in order. You stop for the user's approval a
 `resume <KEY>`: read `progress.md`, `analysis.md`, and `plan.md` from the folder, then continue at the first unchecked step. Don't redo approved steps. `status <KEY>`: print `progress.md` and stop.
 
 ## Steps
+0. **brainstorm** (conditional): when the input is an idea rather than a requirement (no clear goal, or several possible approaches), ask whether to brainstorm first: `skills/brainstorm/SKILL.md`, writing `brainstorm.md` into the spec folder. analyze then takes it as input. Otherwise mark it skipped.
 1. **analyze**: `skills/analyze/SKILL.md`. If the input is already an analysis file, copy it in and go to the gate.
 2. **spike** (conditional): only when the analysis lists an unknown that needs research before planning. At the gate, ask whether to run it: `skills/spike/SKILL.md`, with the result appended to `analysis.md` under `## Spike result`. Otherwise mark it skipped.
 3. **plan**: `skills/plan/SKILL.md`, with `analysis.md` as the input.

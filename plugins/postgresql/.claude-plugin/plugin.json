@@ -1,7 +1,7 @@
 {
   "name": "postgresql",
   "version": "3.0.0",
-  "description": "PostgreSQL query tuning, indexing, schema review, lock-safe migrations, and live diagnostics through read-only psql work orders run by a Haiku runner.",
+  "description": "PostgreSQL query tuning, indexing, schema review, live schema audit with fix migrations, lock-safe migrations, and live diagnostics through read-only psql work orders run by a Haiku runner.",
   "author": { "name": "Ritesh Tak" },
   "license": "MIT",
   "keywords": ["postgresql", "postgres", "npgsql", "efcore", "performance"],

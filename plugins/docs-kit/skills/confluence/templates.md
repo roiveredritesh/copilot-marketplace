@@ -60,3 +60,33 @@ Cover: happy path; each validation rule (client and server, with the exact messa
 ## Regression risks: nearby features touched by the change
 ```
 Every expected message and rule must come from the code (with path:line). Mark anything not found in code as "(to confirm)".
+
+## spike - Spike report
+```
+# Spike: <question>
+Summary: answer/recommendation in 2-3 lines | confidence: high/medium/low | time-boxed to <n>h | <date> | ticket <KEY link> | author
+## Question: what was unclear and which decision it unblocks
+## Constraints and criteria: must-haves and how options were judged
+## Options compared
+| Criterion | Option A | Option B | ... |   (every cell backed by a source link or code reference)
+## Findings: key facts, each with its source (docs/release-notes links, NuGet, file:line)
+## PoC: what was built, what it proved and what it didn't, branch or repo link (omit if none)
+## Recommendation: the choice and the deciding reasons
+## Risks, assumptions, open questions: label assumptions as such
+## Next steps: tickets to create, an ADR if the decision is accepted, owners
+## Sources: links
+```
+
+## findings - Ticket findings (bug investigation or story analysis)
+```
+# <KEY>: <ticket summary> - findings
+Summary: status (root cause found | analysis complete | decision needed) | conclusion in 2-3 lines | <date> | <Jira link> | author
+## Problem: what was reported, impact (who, how many, since when), environment/version
+## Investigation
+| Check | Evidence (log line, query, file:line, commit) | Result |
+## Root cause (bug) / Analysis (story): explanation with file:line and commit references
+## Fix or proposal: what changes where, risk, PR link if one exists
+## Verification: how it was or will be tested (test names, steps), how to confirm in production
+## Decisions needed / open questions
+## Follow-ups: tickets, monitoring/alerts, docs to update
+```

@@ -1,10 +1,12 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "ritesh-marketplace",
-  "owner": { "name": "Ritesh Tak" },
+  "owner": {
+    "name": "Ritesh Tak"
+  },
   "metadata": {
     "version": "3.0.0",
-    "description": "Cost-optimized .NET (Core + Framework) and PostgreSQL plugins for Claude Code: thin skills in the main session, Haiku executors for exploration, git, build/test, and MCP work."
+    "description": "Cost-optimized .NET (Core + Framework), PostgreSQL, and SQL Server plugins for Claude Code: thin skills that load only when invoked, Haiku executors for exploration, git, build/test, and MCP work."
   },
   "plugins": [
     {
@@ -16,13 +18,20 @@
     {
       "name": "dotnet",
       "source": "./plugins/dotnet",
-      "description": "Build, test, review, debug, and plan for any .NET repo (SDK-style and legacy .NET Framework), plus EF Core / ASP.NET Core / async guidance.",
+      "description": "The full .NET SDLC for any repo (SDK-style and legacy .NET Framework): brainstorm, analyze, spike, plan, implement, tests, build, review, debug, PR and PR comments, CI, audit, plus a gated end-to-end flow.",
       "category": "development"
     },
     {
       "name": "postgresql",
       "source": "./plugins/postgresql",
-      "description": "PostgreSQL query tuning, indexes, schema review, lock-safe migrations, and live diagnostics via read-only psql.",
+      "description": "PostgreSQL query tuning, indexes, schema review, live schema audit with fix migrations, lock-safe migrations, and diagnostics via read-only psql.",
+      "category": "development",
+      "defaultEnabled": false
+    },
+    {
+      "name": "sqlserver",
+      "source": "./plugins/sqlserver",
+      "description": "SQL Server live schema audit with fix migrations (EF Core or SQL) and migration safety review via read-only sqlcmd.",
       "category": "development",
       "defaultEnabled": false
     },
