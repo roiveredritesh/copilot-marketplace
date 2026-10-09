@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Detect, build, or test any .NET repo (SDK-style or legacy .NET Framework) with condensed output.
-# Usage: dotnet.sh detect|build|test [solution-or-project]
+# Usage: dotnet.sh detect|build|test|coverage|audit [solution-or-project]
+# Env: DOTNET_TEST_FILTER (test/coverage filter expression), DOTNET_COVERAGE_FILE_REGEX (focus coverage on matching files)
 # Always exits 0 and prints "STATUS: ..." first so callers parse text, not exit codes.
 set -u
 cmd=${1:-detect}; target=${2:-}
 max=${DOTNET_SH_MAX_LINES:-40}
+filter=${DOTNET_TEST_FILTER:-}
 
 # Tracked + untracked files when inside git (skips ignored bin/obj); else find. Arg: filename regex.
 list() {
@@ -67,14 +69,45 @@ build|test)
     dlls=$(echo "$tests" | while IFS= read -r p; do n=$(grep -oE '<AssemblyName>[^<]+' "$p" | sed 's/.*>//'); n=${n:-$(basename "${p%.*}")}
       find "$(dirname "$p")/bin" -name "$n.dll" -newer "$p" 2>/dev/null | head -1; done)
     [ -z "$dlls" ] && { echo "STATUS: BLOCKED test assemblies not found under bin/"; exit 0; }
-    out=$(echo "$dlls" | tr '\n' '\0' | xargs -0 "$vstest" /Logger:console\;verbosity=minimal 2>&1); rc=$?
+    out=$(echo "$dlls" | tr '\n' '\0' | xargs -0 "$vstest" /Logger:console\;verbosity=minimal ${filter:+"/TestCaseFilter:$filter"} 2>&1); rc=$?
   else
-    out=$(dotnet test "$target" --no-build -nologo -v q --logger 'console;verbosity=minimal' 2>&1); rc=$?
+    out=$(dotnet test "$target" --no-build -nologo -v q --logger 'console;verbosity=minimal' ${filter:+--filter "$filter"} 2>&1); rc=$?
   fi
+  echo "$out" | grep -qiE 'No test matches|No test is available' && { echo "STATUS: NO TESTS MATCHED${filter:+ (filter: $filter)}"; exit 0; }
   summary=$(echo "$out" | grep -E 'Passed!|Failed!|Total tests|Passed:|Failed:' | tail -3)
   if [ $rc -ne 0 ]; then echo "STATUS: TESTS FAILED"; echo "$summary"; echo "$out" | condense '^\s*(Failed |Assert|Expected|Actual|at .* in .*:line|error )'
   else echo "STATUS: TESTS PASSED"; echo "$summary"; fi
   ;;
-*) echo "STATUS: BLOCKED unknown command '$cmd' (use detect|build|test)";;
+coverage)
+  [ -n "$legacy" ] && { echo "STATUS: BLOCKED coverage needs SDK-style test projects (coverlet); legacy projects present"; exit 0; }
+  dir=$(mktemp -d)
+  out=$(dotnet test "$target" -nologo -v q --collect:"XPlat Code Coverage" --results-directory "$dir" ${filter:+--filter "$filter"} 2>&1); rc=$?
+  files=$(find "$dir" -name 'coverage.cobertura.xml')
+  [ -z "$files" ] && { echo "STATUS: BLOCKED no coverage file; add the coverlet.collector package to the test projects"; echo "$out" | condense ': error |Failed '; rm -rf "$dir"; exit 0; }
+  [ $rc -ne 0 ] && echo "STATUS: COVERAGE (TESTS FAILED - numbers incomplete)" || echo "STATUS: COVERAGE"
+  for f in $files; do echo "overall line-rate: $(grep -oE '<coverage [^>]*line-rate="[0-9.]+"' "$f" | grep -oE '[0-9.]+"$' | tr -d '"' | head -1)"; done
+  # ponytail: strips paths up to the repo folder name; wrong only if a subfolder repeats that name
+  echo "lowest classes (line-rate class file):"
+  cat $files | grep -oE '<class name="[^"]+" filename="[^"]+" line-rate="[0-9.]+"' | tr '\\' '/' | sed "s#filename=\"[^\"]*/$(basename "$PWD")/#filename=\"#" | sed -E 's/<class name="([^"]+)" filename="([^"]+)" line-rate="([0-9.]+)"/\3 \1 \2/' | grep -E "${DOTNET_COVERAGE_FILE_REGEX:-.}" | sort -n | awk '!seen[$2]++' | head -n 15
+  rm -rf "$dir"
+  ;;
+audit)
+  echo "STATUS: AUDIT"
+  if [ -n "$legacy" ] || list '(^|/)packages\.config$' | grep -q .; then echo "note: packages.config/legacy projects are not covered by 'dotnet list package' - migrate them to PackageReference"; fi
+  if [ "$(echo "$legacy" | grep -c .)" -lt "$(echo "$projects" | grep -c .)" ]; then
+    dotnet restore "$target" -v q >/dev/null 2>&1
+    for kind in vulnerable deprecated outdated; do
+      extra=; [ $kind = vulnerable ] && extra=--include-transitive
+      rows=$(dotnet list "$target" package --$kind $extra 2>&1 | grep -E '^\s+> ' | sed -E 's/^\s+> //; s/\s+/ /g' | awk '!seen[$0]++')
+      echo "$kind: $(echo "$rows" | grep -c .)"; echo "$rows" | grep . | head -n 20 | sed 's/^/  /'
+    done
+  fi
+  echo "frameworks: ${tfms:-unknown}"
+  # Report locations only, never the secret values.
+  pat='(Password|Pwd)=[^;"'"'"' ]{3,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|gh[pousr]_[A-Za-z0-9]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|AccountKey=[A-Za-z0-9+/=]{20,}|sk-[A-Za-z0-9_-]{20,}'
+  hits=$(git grep -nIE "$pat" -- . ':!*.md' 2>/dev/null | cut -d: -f1,2)
+  echo "possible secrets: $(echo "$hits" | grep -c .)"; echo "$hits" | grep . | head -n 20 | sed 's/^/  /'
+  ;;
+*) echo "STATUS: BLOCKED unknown command '$cmd' (use detect|build|test|coverage|audit)";;
 esac
 exit 0

@@ -434,3 +434,19 @@ The ~44K baseline comes from other global plugins, MCPs, and CLAUDE.md, not from
 - `/core:setup` end to end: the Atlassian/GitHub MCP servers aren't configured on this machine (`claude mcp list` shows neither), and whether the remote Atlassian OAuth works from a user-level agent with inline `mcpServers`.
 - Whether `modelSettings.claude-haiku-5-5.autoCompactWindow` applies inside subagents (check `compact_boundary` in a long Haiku subagent transcript).
 - Model-driven skills (review/debug/plan/modernize/confluence) were checked by reading only. P4 measures them on public sample repos.
+
+## 11. SDLC gap skills (added 2026-10-09)
+
+The user asked for full SDLC coverage. Added to `dotnet`, all user-invoked:
+
+| Skill | Gap filled | Haiku part |
+|---|---|---|
+| `implement` | plan execution with **TDD by default** (red → green → refactor → full-suite gate), stops on red | runner: filtered test (red/green), full suite per step |
+| `tests` | writing tests in the repo's style, coverage | scout: test house style; runner: filtered test runs, coverage |
+| `ci` | failed-run triage (gh / az) + pipeline generation (GitHub Actions / Azure DevOps, SDK + Framework) | runner: `gh run view --log-failed` condensed to ≤ 60 lines |
+| `pr` | commit message in the repo's convention + `gh pr create` (GitHub MCP via publisher as fallback). Asks first | runner: status/diffstat/log facts |
+| `audit` | vulnerable/deprecated/outdated NuGet, secret **locations** (never values), framework support dates | runner: `dotnet.sh audit` |
+
+`dotnet.sh` gained `coverage` (coverlet cobertura → overall + 15 lowest classes, repo-relative), `audit`, and `DOTNET_TEST_FILTER` (`--filter` / `/TestCaseFilter`, plus `STATUS: NO TESTS MATCHED`, which TDD red checks need).
+
+Verified: filtered test pass / no-match, coverage output, audit on the sample (1 deprecated, 4 outdated, 1 secret location), and a live `/dotnet:audit` run ($0.012, Haiku main). Observation: when the main model can call `dotnet.sh` directly, it may skip the runner. That's acceptable, since the script output is already condensed (≤ 40 lines), so a subagent spawn would cost about the same. The runner matters for outputs that need condensing beyond the script (git history, CI logs, psql).

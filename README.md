@@ -23,10 +23,27 @@ Restart Claude Code afterwards.
 | Plugin | Enable in | Gives you |
 |---|---|---|
 | `core` | everywhere (required) | `scout`, `runner` (Haiku), `reviewer` (Sonnet), `/core:setup` |
-| `dotnet` | every .NET repo | `/dotnet:build [build\|test]`, `/dotnet:review [base\|PR#]`, `/dotnet:debug <trace>`, `/dotnet:plan <goal>`, EF Core / ASP.NET Core / async guidance (auto-loads on `.cs` files) |
+| `dotnet` | every .NET repo | the full SDLC loop, below |
 | `postgresql` | repos using PostgreSQL | `pg` skill: query tuning, indexes, schema review, lock-safe migrations, diagnostics (read-only `psql`) |
 | `dotnet-legacy` | WebForms / .NET Framework 4.x repos | `/dotnet-legacy:modernize` inventory and migration plan |
 | `docs-kit` | where you write Confluence or read Jira | `/docs-kit:confluence <type> <space\|page>`, `jira <KEY>` |
+
+### SDLC coverage (`dotnet` + friends)
+
+| Phase | Command |
+|---|---|
+| Intake | `/docs-kit:jira PROJ-123` |
+| Plan / design | `/dotnet:plan <goal>` · ADR via `/docs-kit:confluence adr` · `dotnet:guide` (auto) · `/dotnet-legacy:modernize` |
+| Implement (TDD) | `/dotnet:implement <plan or task>`: failing test → code → green, Haiku build/test gate after every step |
+| Tests | `/dotnet:tests <target> [--coverage]` |
+| Build / test | `/dotnet:build [build\|test]` |
+| Review | `/dotnet:review [base\|PR#]` |
+| Commit / PR | `/dotnet:pr [base] [--draft]` |
+| CI/CD | `/dotnet:ci triage [run\|PR#]` · `/dotnet:ci generate [github\|azure]` |
+| Security / deps | `/dotnet:audit`: vulnerable/deprecated/outdated NuGet, secret locations, framework support dates |
+| Debug / RCA | `/dotnet:debug <trace\|error\|failing test>` |
+| Database | `postgresql:pg` (auto, or `/postgresql:pg`) |
+| Docs / release | `/docs-kit:confluence <api\|adr\|runbook\|release-notes\|qa-guide> <space\|page>` |
 
 `postgresql`, `dotnet-legacy`, and `docs-kit` are off by default. A disabled plugin costs zero tokens. Turn one on for a repo in its `.claude/settings.json`:
 ```json
