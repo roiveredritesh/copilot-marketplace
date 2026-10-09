@@ -13,10 +13,11 @@ Cost-optimized Claude Code plugins for .NET (Core **and** Framework) and Postgre
 `/core:setup` runs once. It shows every change and asks before applying it:
 - subagents default to Haiku
 - the built-in Explore agent runs on Haiku
-- Haiku compacts at 100K tokens (its price rises 5x above that)
 - an isolated `publisher` agent owns the Confluence/Jira/GitHub MCP servers, so their tools stay out of the main session
 
-Restart Claude Code afterwards.
+Restart Claude Code afterwards. Install `postgresql`, `dotnet-legacy`, and `docs-kit` with **project scope**, only in the repos that need them.
+
+To try the plugins from a local checkout before they reach `main`: `/plugin marketplace add "<path to this repo>"`.
 
 ## Plugins: enable per repo
 
@@ -61,7 +62,7 @@ Restart Claude Code afterwards.
 Check the overhead in any session with `/context`.
 
 ## Requirements
-- Claude Code 2.1.288+ (per-model compaction window).
+- A recent Claude Code (tested on 2.1.295). Its default compaction already keeps Haiku requests under 100K tokens.
 - `bash` (Git Bash on Windows), plus the .NET SDK and/or Visual Studio Build Tools for legacy projects.
 - Optional: `psql` (PostgreSQL), `gh` (GitHub PRs), the Atlassian remote MCP (docs-kit).
 
