@@ -22,7 +22,7 @@ Restart Claude Code afterwards.
 
 | Plugin | Enable in | Gives you |
 |---|---|---|
-| `core` | everywhere (required) | `scout`, `runner` (Haiku), `reviewer` (Sonnet), `/core:setup` |
+| `core` | everywhere (required) | `scout` (code + web), `runner` (Haiku), `reviewer` (Sonnet), `/core:setup` |
 | `dotnet` | every .NET repo | the full SDLC loop, below |
 | `postgresql` | repos using PostgreSQL | `pg` skill: query tuning, indexes, schema review, lock-safe migrations, diagnostics (read-only `psql`) |
 | `dotnet-legacy` | WebForms / .NET Framework 4.x repos | `/dotnet-legacy:modernize` inventory and migration plan |
@@ -33,6 +33,7 @@ Restart Claude Code afterwards.
 | Phase | Command |
 |---|---|
 | Intake | `/docs-kit:jira PROJ-123` |
+| Spike / research | `/dotnet:spike <question> [--poc]`: existing code or new tech, with sourced facts and an option matrix |
 | Plan / design | `/dotnet:plan <goal>` · ADR via `/docs-kit:confluence adr` · `dotnet:guide` (auto) · `/dotnet-legacy:modernize` |
 | Implement (TDD) | `/dotnet:implement <plan or task>`: failing test → code → green, Haiku build/test gate after every step |
 | Tests | `/dotnet:tests <target> [--coverage]` |

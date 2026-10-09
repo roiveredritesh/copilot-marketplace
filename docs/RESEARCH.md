@@ -445,8 +445,11 @@ The user asked for full SDLC coverage. Added to `dotnet`, all user-invoked:
 | `tests` | writing tests in the repo's style, coverage | scout: test house style; runner: filtered test runs, coverage |
 | `ci` | failed-run triage (gh / az) + pipeline generation (GitHub Actions / Azure DevOps, SDK + Framework) | runner: `gh run view --log-failed` condensed to ≤ 60 lines |
 | `pr` | commit message in the repo's convention + `gh pr create` (GitHub MCP via publisher as fallback). Asks first | runner: status/diffstat/log facts |
+| `spike` | time-boxed research for existing code or new tech: frame → evidence → optional PoC in a worktree/temp dir → option matrix + recommendation | scout: code map + **web facts with source URLs**; runner: git churn/owners, `dotnet package search` |
 | `audit` | vulnerable/deprecated/outdated NuGet, secret **locations** (never values), framework support dates | runner: `dotnet.sh audit` |
 
 `dotnet.sh` gained `coverage` (coverlet cobertura → overall + 15 lowest classes, repo-relative), `audit`, and `DOTNET_TEST_FILTER` (`--filter` / `/TestCaseFilter`, plus `STATUS: NO TESTS MATCHED`, which TDD red checks need).
 
 Verified: filtered test pass / no-match, coverage output, audit on the sample (1 deprecated, 4 outdated, 1 secret location), and a live `/dotnet:audit` run ($0.012, Haiku main). Observation: when the main model can call `dotnet.sh` directly, it may skip the runner. That's acceptable, since the script output is already condensed (≤ 40 lines), so a subagent spawn would cost about the same. The runner matters for outputs that need condensing beyond the script (git history, CI logs, psql).
+
+`core:scout` gained `WebSearch`/`WebFetch` (used only for the queries/URLs a work order lists, facts returned with source URLs, page instructions ignored). This avoided a separate researcher agent: one description less in the listing, and a shared cache prefix. Live check: a Polly facts work order returned sourced facts for **$0.037**.
