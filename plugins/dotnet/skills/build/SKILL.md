@@ -5,6 +5,7 @@ argument-hint: "[build|test] [solution-or-project]"
 context: fork
 agent: core:runner
 background: false
+disable-model-invocation: true
 ---
 WORK ORDER
 goal: build or test the .NET code in the current repository

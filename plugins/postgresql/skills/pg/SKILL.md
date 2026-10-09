@@ -2,6 +2,7 @@
 name: pg
 description: PostgreSQL work - slow query tuning (EXPLAIN), index advice, schema review, lock-safe migrations (incl. EF Core), live diagnostics (locks, bloat, vacuum), Npgsql specifics. Loads one focused reference per task.
 argument-hint: "[query | table | migration file | symptom]"
+disable-model-invocation: true
 ---
 # PostgreSQL
 

@@ -23,7 +23,7 @@ Goal / Non-goals
 Approach: 2-4 sentences, and why this over the obvious alternative
 Steps (each small enough to build and test on its own):
   1. <change> - files: path, path - verify: build | test <name> | manual check
-Data/migrations: schema changes and lock-safety (PostgreSQL: see postgresql:pg)
+Data/migrations: schema changes and lock-safety (suggest `/postgresql:pg` or `/sqlserver:mssql` for the migration review)
 Risks & rollback
 Test plan
 ```

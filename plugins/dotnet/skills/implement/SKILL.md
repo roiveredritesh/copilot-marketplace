@@ -33,7 +33,8 @@ No new tests are written in this mode. At the end, list the behaviors left untes
 ## Rules (both modes)
 - **Stop on red.** If a step or its gate fails twice in a row, stop, show the runner output and your hypothesis, and ask. Don't start the next step on a red build.
 - Change only the files the step names. If another file must change, say so first.
-- Database migrations: generate them, show the SQL (`dotnet ef migrations script`), and check them against `postgresql:pg` migration-safety. Don't apply them to a shared database.
+- Database migrations: generate them, show the SQL (`dotnet ef migrations script`), and suggest a lock-safety check with `/postgresql:pg <file>` or `/sqlserver:mssql <file>` (whichever the repo uses). Don't apply them to a shared database.
+- Guidance: when a step touches EF Core, ASP.NET Core, or hot-path/async code, read only the matching file from `${CLAUDE_PLUGIN_ROOT}/skills/guide/` (`efcore.md`, `aspnetcore.md`, `csharp-perf.md`).
 - Don't commit. At the end, suggest `/dotnet:review` and then `/dotnet:pr`.
 
 ## Finish (at most 15 lines)

@@ -2,6 +2,7 @@
 name: jira
 description: Fetch a Jira ticket by key (e.g. PROJ-123) as a condensed summary through the isolated Haiku publisher, ready for /dotnet:debug or /dotnet:analyze.
 argument-hint: "<ISSUE-KEY>"
+disable-model-invocation: true
 ---
 # Jira intake
 

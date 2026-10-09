@@ -18,7 +18,7 @@ You (the main session) do the judging. Haiku agents only fetch and run things. K
 - Only if the diff is **over 600 changed lines**: split the changed files into chunks of about 400 lines (keep a file's tests with it) and give each chunk to `core:reviewer` (at most 4) with the base ref. You then review only cross-file concerns.
 
 ## 3. Review (diff ≤ 600 lines, or cross-file concerns)
-Read the diff file by file (`git diff $MB -- <file>`). Open surrounding code only when the hunk alone isn't enough. Apply [checklist.md](checklist.md).
+Read the diff file by file (`git diff $MB -- <file>`). Open surrounding code only when the hunk alone isn't enough. Apply [checklist.md](checklist.md). For EF Core, ASP.NET Core, or hot-path/async changes, also read the matching file from `${CLAUDE_PLUGIN_ROOT}/skills/guide/` (`efcore.md`, `aspnetcore.md`, `csharp-perf.md`).
 When a public signature, DTO, DB column, config key, or route changed, send `core:scout` a work order: "find callers/usages of <symbol> outside <changed files>; return path:line, at most 30 lines".
 
 **Verify before you rely on it:** subagents only see the work order. Give them exact paths, symbols, and commands, never "look around". Before stating a subagent finding as fact in the report, open the 1-2 most decision-critical `path:line` references yourself (a small range each). Drop or label anything that doesn't check out.
