@@ -35,7 +35,7 @@ Runs the SDLC skills of this plugin in order. You stop for the user's approval a
 4. **implement**: `skills/implement/SKILL.md`, with `plan.md` as the input. Pass the mode (`--no-tdd` → code-first). Implement's own stop-on-red rules apply inside the step.
 5. **tests** (code-first mode only): offer `skills/tests/SKILL.md` for the behaviors implement listed as untested. Skip it in TDD mode.
 6. **review**: `skills/review/SKILL.md` against the base branch. Fix high-severity findings only after the user approves them at the gate.
-7. **pr**: `skills/pr/SKILL.md`. It asks again before committing and before creating the PR. Put the analysis goal and acceptance criteria in the PR description.
+7. **pr**: `skills/pr/SKILL.md`. It asks once more (commit + push + PR, commit only, edit, or cancel) before anything is committed. Put the analysis goal and acceptance criteria in the PR description.
 
 ## Gate after every step
 1. Update `progress.md` (step result plus any notes).

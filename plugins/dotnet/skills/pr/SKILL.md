@@ -1,6 +1,6 @@
 ---
 name: pr
-description: Commit the current changes with a message in the repo's convention and open a GitHub PR with a generated description (gh first, GitHub MCP via publisher as fallback). Asks before committing and before creating the PR.
+description: Commit the current changes with a message in the repo's convention and open a GitHub PR with a generated description (gh first, GitHub MCP via publisher as fallback). Asks once, showing exactly what will be committed, pushed, and opened.
 argument-hint: "[base-branch] [--draft] [--commit-only]"
 disable-model-invocation: true
 ---
@@ -14,6 +14,7 @@ steps:
   3. git diff --stat HEAD | tail -n 25
   4. git log -12 --format=%s
   5. gh auth status 2>&1 | head -n 3
+  6. git remote get-url origin; gh repo view --json nameWithOwner --jq .nameWithOwner 2>&1 | head -n 1
 return: the outputs, labelled, at most 80 lines
 ```
 
@@ -24,7 +25,7 @@ return: the outputs, labelled, at most 80 lines
 - On the default branch: propose a branch name (`feat/<slug>`, `fix/<slug>`) and create it before committing.
 
 ## 3. Confirm, then act
-Show the files to stage, the commit message, and (unless `--commit-only`) the PR title and body. Ask once (AskUserQuestion: commit + PR / commit only / edit / cancel). Then:
+Show the files to stage, the commit message, and (unless `--commit-only`) the PR title and body. Ask once (AskUserQuestion: **commit + push + PR** / commit only / edit / cancel), naming the remote and branch the push goes to. If step 6 shows `origin` isn't a GitHub repo (and no `publisher` is set up), don't offer the PR option: offer commit only / edit / cancel and say why. Then:
 1. `git add <files>` (explicit paths, never `git add -A` blindly) and `git commit -F <message file>`.
 2. `git push -u origin <branch>`.
 3. `gh pr create --base <base> --title "<title>" --body-file <file> [--draft]`.
