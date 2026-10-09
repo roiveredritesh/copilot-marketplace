@@ -4,6 +4,7 @@ public static class PriceCalculator
 {
     public static decimal ApplyDiscount(decimal price, decimal percent)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(price);
         if (percent < 0 || percent > 100) throw new ArgumentOutOfRangeException(nameof(percent));
         return RoundMoney(price * (100 - percent) / 100);
     }
