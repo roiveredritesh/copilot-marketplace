@@ -1,6 +1,6 @@
 ---
 name: jira
-description: Fetch a Jira ticket by key (e.g. PROJ-123) as a condensed summary through the isolated Haiku publisher, ready for /dotnet:debug or /dotnet:plan.
+description: Fetch a Jira ticket by key (e.g. PROJ-123) as a condensed summary through the isolated Haiku publisher, ready for /dotnet:debug or /dotnet:analyze.
 argument-hint: "<ISSUE-KEY>"
 ---
 # Jira intake
@@ -26,5 +26,5 @@ on-error: BLOCKED: <one line>
 
 Then, depending on the ticket:
 - Bug with a stack trace or repro steps → suggest `/dotnet:debug` with the extracted trace.
-- Story or task → suggest `/dotnet:plan` with the summary and acceptance criteria.
+- Story or task → suggest `/dotnet:analyze <KEY>` (writes an analysis file), then `/dotnet:plan` with that file.
 Don't paste the full ticket. The condensed form above is the working copy.

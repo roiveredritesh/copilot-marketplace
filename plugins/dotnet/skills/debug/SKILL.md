@@ -31,4 +31,4 @@ Fix: <minimal change, as a short diff sketch>
 Test to add: <name + what it asserts>
 Confidence: high | medium (what would confirm it)
 ```
-With `--save`, also write it to `~/.claude/reports/<repo-folder-name>/debug-<yyyymmdd-hhmm>.md` and print the path.
+With `--save`, also write it to `.reports/debug-<yyyymmdd-hhmm>.md` and print the path. Before the first write, keep `.reports/` out of git: `p=$(git rev-parse --git-path info/exclude); grep -qx .reports/ "$p" 2>/dev/null || echo .reports/ >> "$p"`.

@@ -35,4 +35,4 @@ Phases: each one deployable on its own, with exit criteria (builds, tests green,
 Risks: third-party controls (e.g. Telerik), auth/session sharing, perf parity, team skills
 First 3 concrete steps
 ```
-For the file-level plan of one phase, hand off to `/dotnet:plan`. With `--save`, also write the report to `~/.claude/reports/<repo-folder-name>/modernize-<yyyymmdd>.md`.
+For the file-level plan of one phase, hand off to `/dotnet:plan`. With `--save`, also write the report to `.reports/modernize-<yyyymmdd>.md`. Before the first write, keep `.reports/` out of git: `p=$(git rev-parse --git-path info/exclude); grep -qx .reports/ "$p" 2>/dev/null || echo .reports/ >> "$p"`.

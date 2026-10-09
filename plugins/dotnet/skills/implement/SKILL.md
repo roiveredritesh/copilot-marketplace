@@ -1,16 +1,18 @@
 ---
 name: implement
-description: Execute a plan or task step by step with TDD (failing test first, then code, then green) and a Haiku build/test check after every step; stops on red instead of piling on changes.
+description: Execute a plan or task step by step - TDD by default (failing test first, then code, then green), or code-first with --no-tdd - with a Haiku build/test check after every step; stops on red instead of piling on changes.
 argument-hint: "<plan file | 'the plan above' | task> [--no-tdd]"
 disable-model-invocation: true
 ---
-# Implement with TDD
+# Implement
 
 Input: a plan (from `/dotnet:plan`, a file, or the conversation) or a single task. Without a plan, write a 3–7 step plan first (each step small, with its files and how it will be verified) and show it before starting.
 
-Make the test style known: if this session hasn't seen the repo's tests yet, use step 1 of `/dotnet:tests` (the scout house-style order).
+**Mode.** TDD is the default. Use **code-first** mode when the user passes `--no-tdd` or asks for it in words ("without TDD", "no tests first", "bina TDD"). State the mode in your first line.
 
-## Loop, one step at a time
+## TDD loop (default), one step at a time
+Make the test style known first: if this session hasn't seen the repo's tests yet, use step 1 of `/dotnet:tests` (the scout house-style order).
+
 For each step:
 
 1. **Red.** Write the smallest test that expresses the step's behavior. Run `core:runner`:
@@ -20,12 +22,19 @@ For each step:
 3. **Refactor** only if the step left duplication or an unclear name. Re-run.
 4. **Step gate.** `core:runner`: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/dotnet.sh" test` (the full suite) → must be `TESTS PASSED`. Then print one line: `step <n>/<total> done - <files changed>`.
 
-Rules:
-- **Stop on red.** If green or the gate fails twice in a row, stop, show the runner output and your hypothesis, and ask. Don't start the next step on a red build.
+A step with no testable behavior (config, DI wiring) skips red/green with a one-line reason but still runs the step gate.
+
+## Code-first loop (`--no-tdd`), one step at a time
+1. **Code.** Make the step's change.
+2. **Step gate.** `core:runner`: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/dotnet.sh" test`. The existing suite must report `TESTS PASSED`, or `BUILD OK, no test projects` when the repo has no tests. Then print one line: `step <n>/<total> done - <files changed>`.
+
+No new tests are written in this mode. At the end, list the behaviors left untested and suggest `/dotnet:tests <target>` for them.
+
+## Rules (both modes)
+- **Stop on red.** If a step or its gate fails twice in a row, stop, show the runner output and your hypothesis, and ask. Don't start the next step on a red build.
 - Change only the files the step names. If another file must change, say so first.
-- Skip tests (`--no-tdd`, or a step with no testable behavior such as config or DI wiring) only with a one-line reason, but still run the build gate (`dotnet.sh build`).
 - Database migrations: generate them, show the SQL (`dotnet ef migrations script`), and check them against `postgresql:pg` migration-safety. Don't apply them to a shared database.
 - Don't commit. At the end, suggest `/dotnet:review` and then `/dotnet:pr`.
 
 ## Finish (at most 15 lines)
-Steps done, tests added, final suite STATUS, open issues or follow-ups.
+Mode, steps done, tests added (or behaviors left untested in code-first mode), final suite STATUS, open issues or follow-ups.

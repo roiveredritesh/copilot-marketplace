@@ -49,4 +49,4 @@ PoC result: <if run>
 Risks & unknowns: what is still unproven, and how to prove it
 Next steps: concrete, with a rough effort (S/M/L) - hand-off to /dotnet:plan
 ```
-With `--save`, also write the report to `~/.claude/reports/<repo-folder-name>/spike-<slug>-<yyyymmdd>.md`. With `--confluence <space>`, publish it as an ADR-style page through `/docs-kit:confluence adr` (needs docs-kit).
+With `--save`, also write the report to `.reports/spike-<slug>-<yyyymmdd>.md`. With `--confluence <space>`, publish it as an ADR-style page through `/docs-kit:confluence adr` (needs docs-kit). Before the first write, keep `.reports/` out of git: `p=$(git rev-parse --git-path info/exclude); grep -qx .reports/ "$p" 2>/dev/null || echo .reports/ >> "$p"`.

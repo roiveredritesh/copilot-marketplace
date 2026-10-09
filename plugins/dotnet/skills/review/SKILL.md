@@ -30,4 +30,4 @@ Build/tests: <runner STATUS line>
 | Sev | Location | Problem | Fix |
 ```
 Most severe first, real problems only (no style nits unless asked). End with "Not checked:" if any part was skipped.
-With `--save`, also write the report to `~/.claude/reports/<repo-folder-name>/review-<branch-or-pr>-<yyyymmdd>.md` and print the path.
+With `--save`, also write the report to `.reports/review-<branch-or-pr>-<yyyymmdd>.md` and print the path. Before the first write, keep `.reports/` out of git: `p=$(git rev-parse --git-path info/exclude); grep -qx .reports/ "$p" 2>/dev/null || echo .reports/ >> "$p"`.

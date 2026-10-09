@@ -33,10 +33,12 @@ To try the plugins from a local checkout before they reach `main`: `/plugin mark
 
 | Phase | Command |
 |---|---|
+| **All phases, gated** | `/dotnet:flow <KEY \| details> [--no-tdd]`: runs every phase below in order and waits for your approval after each one (spec-driven) |
 | Intake | `/docs-kit:jira PROJ-123` |
+| Analysis | `/dotnet:analyze <PROJ-123 \| details>`: goal, current behavior, acceptance criteria, impacted areas, open questions → an analysis file for `/dotnet:plan` |
 | Spike / research | `/dotnet:spike <question> [--poc]`: existing code or new tech, with sourced facts and an option matrix |
 | Plan / design | `/dotnet:plan <goal>` · ADR via `/docs-kit:confluence adr` · `dotnet:guide` (auto) · `/dotnet-legacy:modernize` |
-| Implement (TDD) | `/dotnet:implement <plan or task>`: failing test → code → green, Haiku build/test gate after every step |
+| Implement | `/dotnet:implement <plan or task> [--no-tdd]`: TDD by default (failing test → code → green), or code-first with `--no-tdd`; Haiku build/test gate after every step |
 | Tests | `/dotnet:tests <target> [--coverage]` |
 | Build / test | `/dotnet:build [build\|test]` |
 | Review | `/dotnet:review [base\|PR#]` |
@@ -72,8 +74,10 @@ The full SDLC loop. Builds and tests go through `scripts/dotnet.sh`. It detects 
 | Command | Use case | Example |
 |---|---|---|
 | `/dotnet:spike <question> [--poc]` | Research before you commit to a direction. Covers existing code ("how does X work, what breaks if we change Y") or new tech ("which library"). Haiku gathers code, git, web, and NuGet facts. Main builds an option matrix where every cell has a source, then recommends. `--poc` builds a throwaway experiment in a separate worktree. | `/dotnet:spike IMemoryCache, HybridCache or output caching for the catalog page?` |
-| `/dotnet:plan <goal>` | Turns a feature, refactor, or migration into a file-level step plan. Haiku maps the relevant code first. | `/dotnet:plan add soft delete to Orders, incl. EF migration` |
-| `/dotnet:implement <plan or task>` | Executes a plan with TDD: failing test, then code, then green. After every step Haiku builds and runs the tests, and it stops on red instead of piling on changes. `--no-tdd` turns TDD off. | `/dotnet:implement the plan above` |
+| `/dotnet:flow <KEY \| details> [--no-tdd]` | **Spec-driven development in one command.** Runs analyze, spike (only if research is needed), plan, implement, tests (code-first only), review, and pr. After every step it shows a short summary and asks you to **Approve** (next step), **Revise** (redo this step with your feedback), or **Pause**. Specs live in `.reports/<KEY>/` (`analysis.md`, `plan.md`, `progress.md`). `/dotnet:flow resume <KEY>` continues in a fresh session, which is cheaper than one long session. `/dotnet:flow status <KEY>` shows progress. | `/dotnet:flow PROJ-123` · `/clear` then `/dotnet:flow resume PROJ-123` |
+| `/dotnet:analyze <KEY \| details>` | Requirement analysis before planning, from a Jira ticket key (fetched by the Haiku `publisher`) or details you give. Haiku finds where the behavior lives today and the recent git history. Main separates facts (`path:line`, ticket text) from assumptions, writes acceptance criteria (marked *proposed* when the ticket lacks them), lists impacted areas, risks, and open questions, and asks you any blocking question. Output: `.reports/analysis-<KEY>.md`. | `/dotnet:analyze PROJ-123` or `/dotnet:analyze users need a wishlist on the catalog page` |
+| `/dotnet:plan <analysis file \| goal>` | Turns an analysis file, feature, refactor, or migration into a file-level step plan. Haiku maps the relevant code first. With an analysis file it doesn't re-ask settled questions, and the acceptance criteria become the test plan. | `/dotnet:plan .reports/analysis-PROJ-123.md` |
+| `/dotnet:implement <plan or task> [--no-tdd]` | Executes a plan step by step. **TDD (default):** failing test, then code, then green. **Code-first (`--no-tdd`, or just say "without TDD"):** code, then the existing suite must stay green; no new tests, and untested behaviors are listed at the end for `/dotnet:tests`. In both modes Haiku builds and tests after every step, and it stops on red instead of piling on changes. | `/dotnet:implement the plan above` · `/dotnet:implement --no-tdd add CatalogItem.IsFree` |
 | `/dotnet:tests <target> [--coverage]` | Writes tests in the repo's existing style (xUnit/NUnit/MSTest, its mocking and assertion libraries), runs them, and can report coverage. | `/dotnet:tests OrderService.Cancel --coverage` |
 | `/dotnet:build [build\|test]` *auto* | "Does it build / do the tests pass?" You get back only compiler errors or failing tests, for .NET Core or .NET Framework. | `/dotnet:build test` |
 | `/dotnet:review [base\|PR#]` | Reviews the branch or a GitHub PR for bugs, security issues, and breaking changes, while Haiku runs the tests in parallel. | `/dotnet:review main` or `/dotnet:review 42` |
@@ -115,7 +119,9 @@ MCP calls run in the isolated Haiku `publisher`, so Atlassian tools never load i
 Pass a page URL or id instead of a space to update an existing page.
 
 ### Typical flows
-- **New feature:** `/docs-kit:jira PROJ-1`, then `/dotnet:plan`, `/dotnet:implement`, `/dotnet:review`, and `/dotnet:pr`.
+- **New feature, gated end to end:** `/dotnet:flow PROJ-1`. Approve after each step; `/clear` + `/dotnet:flow resume PROJ-1` between phases keeps the cost down.
+- **New feature, step by step:** `/dotnet:analyze PROJ-1`, then `/dotnet:plan <analysis file>`, `/dotnet:implement`, `/dotnet:review`, and `/dotnet:pr`.
+- **Quick change, no TDD:** `/dotnet:implement --no-tdd <task>`, then `/dotnet:tests <target>` later if needed, and `/dotnet:pr`.
 - **Production bug:** `/dotnet:debug <stack trace>`, then `/dotnet:tests <fix area>` and `/dotnet:pr`.
 - **Tech decision:** `/dotnet:spike <question> --poc`, then `/docs-kit:confluence adr <space>`.
 - **Legacy migration:** `/dotnet-legacy:modernize assess`, then `/dotnet:plan <phase 1>` and `/dotnet:implement`.
@@ -126,7 +132,7 @@ Pass a page URL or id instead of a space to update an existing page.
 2. **Small fixed overhead.** 5 plugins and a handful of skills. Heavy workflows are user-invoked only (`disable-model-invocation`), so they cost nothing until you call them. Guidance loads one reference file at a time.
 3. **Bounded returns.** Executors return 30–40 lines max. Build and test output is condensed by `dotnet.sh` before any model sees it.
 4. **Cache-friendly.** Static agent and skill bodies, no inline model switches, MCP servers isolated in a subagent.
-5. **Reports go to chat.** `--save` writes to `~/.claude/reports/<repo>/`, never into your repo.
+5. **Reports go to chat.** Files (`--save`, analysis, flow specs) go to `.reports/` at the repo root. The skills add it to the repo's local git exclude, so nothing is committed by accident.
 
 Check the overhead in any session with `/context`.
 

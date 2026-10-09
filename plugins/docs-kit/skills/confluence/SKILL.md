@@ -31,7 +31,7 @@ Write only facts the agents returned or you verified. Mark anything assumed with
 **Verify before you rely on it:** subagents only see the work order. Give them exact paths, symbols, and commands, never "look around". Before stating a subagent finding as fact in the report, open the 1-2 most decision-critical `path:line` references yourself (a small range each). Drop or label anything that doesn't check out.
 
 ## 3. Write the page body once
-Use the matching structure in [templates.md](templates.md). Write it in Markdown to `~/.claude/reports/<repo-folder-name>/confluence-<slug>.md` with the Write tool. That one file is the payload. Don't repeat the body in chat; show a 5-line outline instead.
+Use the matching structure in [templates.md](templates.md). Write it in Markdown to `.reports/confluence-<slug>.md` with the Write tool. That one file is the payload. Don't repeat the body in chat; show a 5-line outline instead. Before the first write, keep `.reports/` out of git: `p=$(git rev-parse --git-path info/exclude); grep -qx .reports/ "$p" 2>/dev/null || echo .reports/ >> "$p"`.
 
 ## 4. Publish: dispatch `publisher`
 ```text
