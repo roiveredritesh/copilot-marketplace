@@ -9,7 +9,7 @@ disable-model-invocation: true
 You (the main session) do the judging. Haiku agents only fetch and run things. Keep everything you read proportional to the change.
 
 ## 1. Scope
-- Argument is a PR number or URL: `gh pr view <n> --json number,title,baseRefName,headRefName,additions,deletions,files --jq '{title,baseRefName,headRefName,additions,deletions,files:[.files[].path]}'`. The diff source is `gh pr diff <n>`. If `gh` is missing or not authenticated, fall back to the GitHub MCP if one is available, else stop and say so.
+- Argument is a PR number or URL: `gh pr view <n> --json number,title,baseRefName,headRefName,additions,deletions,files --jq '{title,baseRefName,headRefName,additions,deletions,files:[.files[].path]}'`. The diff source is `gh pr diff <n>`. If `gh` is missing or not authenticated, fall back to plain git (no MCP needed): `git fetch origin pull/<n>/head:pr-<n>`, then diff `origin/<base>...pr-<n>` (base `main` unless the user names one). For metadata (title, base) only, dispatch `publisher` (GitHub MCP) if it is set up. Never call GitHub MCP tools from the main session.
 - Otherwise: base = the first argument, else `main`, else `master`. Let `MB=$(git merge-base <base> HEAD)`. The diff is `git diff $MB` (includes uncommitted work).
 - Run `git diff --shortstat $MB` (or use the PR's additions/deletions) to size it.
 

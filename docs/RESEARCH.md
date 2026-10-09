@@ -384,7 +384,7 @@ Implementation note: P1–P3 are file-heavy but independent per plugin. They can
 | D11 | MCP isolation | **full isolation**: user-level `publisher` with inline Atlassian (+ GitHub fallback). The servers are removed from the main config |
 | D12 | Atlassian MCP | official Atlassian remote server |
 | D13 | SQL Server / legacy scope | **SQL Server dropped** (LINQ-to-SQL, MSSQL query/schema tools, Telerik dropped too). `dotnet-legacy` keeps only **WebForms modernization** + **.NET Framework → .NET migration** |
-| D14 | GitHub | **`gh` CLI via `runner` first**. GitHub MCP (in `publisher`) only as a fallback |
+| D14 | GitHub | **`gh` CLI via `runner` first** (pr, review, ci, release notes). GitHub MCP only as a fallback inside `publisher` (PR creation, PR metadata), never in the main session. review falls back to `git fetch pull/<n>/head`; ci requires `gh` |
 | D15 | `mssql-to-pg` | **Not needed.** No SQL Server → PostgreSQL migration skill |
 
 ---

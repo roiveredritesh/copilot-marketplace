@@ -133,6 +133,7 @@ Pass a page URL or id instead of a space to update an existing page.
 3. **Bounded returns.** Executors return 30–40 lines max. Build and test output is condensed by `dotnet.sh` before any model sees it.
 4. **Cache-friendly.** Static agent and skill bodies, no inline model switches, MCP servers isolated in a subagent.
 5. **Reports go to chat.** Files (`--save`, analysis, flow specs) go to `.reports/` at the repo root. The skills add it to the repo's local git exclude, so nothing is committed by accident.
+6. **GitHub: `gh` first, MCP as fallback.** `gh` adds no tool schemas, and `--json`/`--jq` keep the output small. The GitHub MCP is used only when `gh` can't be (PR creation or metadata), and only inside the isolated `publisher`. `/core:setup` offers to remove it from the main session.
 
 Check the overhead in any session with `/context`.
 

@@ -7,6 +7,8 @@ disable-model-invocation: true
 # CI/CD
 
 ## triage
+GitHub needs the `gh` CLI. If `gh auth status` fails, ask the user to install it or run `gh auth login`. Don't fetch Actions logs through the GitHub MCP: raw logs are far larger than the condensed `gh` output below.
+
 1. `core:runner` work order (GitHub):
    ```text
    steps:
