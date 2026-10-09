@@ -1,0 +1,9 @@
+{
+  "name": "dotnet-legacy",
+  "version": "3.0.0",
+  "description": "Modernize legacy .NET Framework apps: inventory, WebForms to Blazor/Razor Pages/MVC, and .NET Framework to modern .NET migration planning.",
+  "author": { "name": "Ritesh Tak" },
+  "license": "MIT",
+  "keywords": ["webforms", "dotnet-framework", "migration", "modernization", "blazor"],
+  "dependencies": ["core"]
+}

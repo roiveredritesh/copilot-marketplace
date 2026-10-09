@@ -68,8 +68,6 @@ ritesh-marketplace/
 ├── .claude-plugin/marketplace.json
 ├── README.md                      # 2-command setup
 ├── scripts/validate.sh            # claude plugin validate --strict on every plugin
-├── templates/
-│   └── publisher.md               # user-level agent template (inline Atlassian + GitHub MCP), installed by /core:setup
 └── plugins/
     ├── core/                      # executors, stack-agnostic, reused by every plugin (D6)
     │   ├── .claude-plugin/plugin.json
@@ -391,3 +389,38 @@ Implementation note: P1–P3 are file-heavy but independent per plugin. They can
 | D13 | SQL Server / legacy scope | **SQL Server dropped** (LINQ-to-SQL, MSSQL query/schema tools, Telerik dropped too). `dotnet-legacy` keeps only **WebForms modernization** + **.NET Framework → .NET migration** |
 | D14 | GitHub | **`gh` CLI via `runner` first**. GitHub MCP (in `publisher`) only as a fallback |
 | D15 | `mssql-to-pg` | **Not needed.** No SQL Server → PostgreSQL migration skill |
+
+---
+
+## 10. Implementation notes (P1–P3, as built)
+
+Where the build deviates from the plan above, and why:
+
+| Plan | As built | Why |
+|---|---|---|
+| `templates/` at the repo root | `plugins/core/templates/` (Explore.md, publisher.md) | only the plugin directory is installed, so `${CLAUDE_PLUGIN_ROOT}` must reach the templates |
+| `dotnet-detect` + `dotnet-build`, each as `.ps1` + `.sh` | one `plugins/dotnet/scripts/dotnet.sh` (`detect`/`build`/`test`) | Claude Code's Bash tool runs bash on every OS (Git Bash on Windows); one script, half the code |
+| efcore / aspnetcore / csharp-perf as 3 skills | one `dotnet:guide` skill (`paths`-gated) + 3 reference files | one listing entry instead of three; references load only when needed |
+| 5 pg skills + `pg-inspector` agent | one `postgresql:pg` skill + 6 reference files; live SQL goes to `core:runner` | one listing entry, no extra agent, prompt cache shared with the other runner work |
+| optional Postgres `.mcp.json` | not shipped; the skill falls back to an existing Postgres MCP when `psql` is missing | you already have a Postgres MCP; shipping a config would load it in every session |
+| `dotnet-legacy` with two skills | one `modernize` skill + `webforms.md` + `framework-to-net.md` | same reason |
+| docs-kit `confluence-publish`, `jira-intake` | `docs-kit:confluence` (user-invoked) and `docs-kit:jira` | shorter commands |
+
+Skill invocation modes:
+- **`context: fork` into Haiku:** `dotnet:build`.
+- **Model-invocable (in the listing):** `dotnet:guide` (only on matching paths), `postgresql:pg`, `docs-kit:jira`.
+- **User-invoked only (not in the listing):** `dotnet:review`, `dotnet:debug`, `dotnet:plan`, `dotnet-legacy:modernize`, `docs-kit:confluence`, `core:setup`.
+
+### Verified
+- `claude plugin validate --strict`: marketplace + all 5 plugins pass.
+- `dotnet.sh` on a .NET 9 SDK solution: detect; a build with 2 compiler errors comes back condensed to 2 lines; a failing xUnit test shows its name, expected/actual, and the `file:line`.
+- `dotnet.sh` on a legacy non-SDK `v4.8` project: MSBuild found via vswhere; build OK and build-error paths.
+- Live run: `claude -p "/dotnet:build test"` with the plugins loaded forked straight into `core:runner` on Haiku 5.5 and returned the condensed failure. **Cost: $0.0013**, with no main-model turns.
+- The modernize inventory commands, and the `gh ... --jq` release-notes command syntax.
+
+### Not yet verified (needs your environment or P4)
+- The legacy test path (`vstest.console.exe` on a packages.config test project). No such sample was available offline.
+- The PostgreSQL catalog/diagnostic SQL against a live server (no `psql` or database on this machine).
+- `/core:setup` end to end: the Atlassian/GitHub MCP servers aren't configured on this machine (`claude mcp list` shows neither), and whether the remote Atlassian OAuth works from a user-level agent with inline `mcpServers`.
+- Whether `modelSettings.claude-haiku-5-5.autoCompactWindow` applies inside subagents (check `compact_boundary` in a long Haiku subagent transcript).
+- Model-driven skills (review/debug/plan/modernize/confluence) were checked by reading only. P4 measures them on public sample repos.

@@ -1,0 +1,9 @@
+{
+  "name": "docs-kit",
+  "version": "3.0.0",
+  "description": "Confluence pages (API docs, ADRs, runbooks, release notes, QA guides) written from the codebase, and Jira ticket intake - MCP calls run by an isolated Haiku publisher.",
+  "author": { "name": "Ritesh Tak" },
+  "license": "MIT",
+  "keywords": ["confluence", "jira", "documentation", "release-notes", "runbook"],
+  "dependencies": ["core"]
+}
