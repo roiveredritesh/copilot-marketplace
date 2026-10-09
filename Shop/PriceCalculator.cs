@@ -10,6 +10,7 @@ public static class PriceCalculator
 
     public static decimal CartTotal(IReadOnlyList<(decimal Price, int Quantity)> lines, decimal discountPercent)
     {
+        ArgumentNullException.ThrowIfNull(lines);
         decimal total = 0;
         foreach (var line in lines)
             total += line.Price * line.Quantity;

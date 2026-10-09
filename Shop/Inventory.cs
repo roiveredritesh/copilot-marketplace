@@ -6,13 +6,16 @@ public class Inventory
 
     public void Add(string sku, int quantity)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
         _stock[sku] = _stock.GetValueOrDefault(sku) + quantity;
     }
 
-    public void Reserve(string sku, int quantity)
+    public bool TryReserve(string sku, int quantity)
     {
-        int available = _stock.GetValueOrDefault(sku);
+        var available = _stock.GetValueOrDefault(sku);
+        if (available < quantity) return false;
         _stock[sku] = available - quantity;
+        return true;
     }
 
     public int Available(string sku) => _stock.GetValueOrDefault(sku);

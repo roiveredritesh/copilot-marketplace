@@ -9,6 +9,14 @@ public class PriceCalculatorTests
         => Assert.Equal(expected, Shop.PriceCalculator.ApplyDiscount(price, percent));
 
     [Fact]
+    public void ApplyDiscount_RoundsMidpointAwayFromZero()
+        => Assert.Equal(2.35m, Shop.PriceCalculator.ApplyDiscount(2.345m, 0));
+
+    [Fact]
+    public void CartTotal_RejectsNullLines()
+        => Assert.Throws<ArgumentNullException>(() => Shop.PriceCalculator.CartTotal(null!, 0));
+
+    [Fact]
     public void ApplyDiscount_RejectsPercentAbove100()
         => Assert.Throws<ArgumentOutOfRangeException>(() => Shop.PriceCalculator.ApplyDiscount(10, 101));
 }
