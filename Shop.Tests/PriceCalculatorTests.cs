@@ -11,4 +11,8 @@ public class PriceCalculatorTests
     [Fact]
     public void ApplyDiscount_RejectsPercentAbove100()
         => Assert.Throws<ArgumentOutOfRangeException>(() => Shop.PriceCalculator.ApplyDiscount(10, 101));
+
+    [Fact]
+    public void CartTotal_SumsLinesAndAppliesDiscount()
+        => Assert.Equal(20m, Shop.PriceCalculator.CartTotal(new[] { (5m, 0), (10m, 2) }, 0));
 }

@@ -7,4 +7,12 @@ public static class PriceCalculator
         if (percent < 0 || percent > 100) throw new ArgumentOutOfRangeException(nameof(percent));
         return Math.Round(price * (100 - percent) / 100, 2, MidpointRounding.AwayFromZero);
     }
+
+    public static decimal CartTotal(IReadOnlyList<(decimal Price, int Quantity)> lines, decimal discountPercent)
+    {
+        decimal total = 0;
+        for (int i = 1; i < lines.Count; i++)
+            total += lines[i].Price * lines[i].Quantity;
+        return ApplyDiscount(total, discountPercent);
+    }
 }
