@@ -499,3 +499,13 @@ Five 1,600-line files were read in 800-line chunks, about 25K tokens per read. E
 `modelSettings.<model>.autoCompactWindow` changed nothing: 60K and the default compact at the same point. The default already keeps every Haiku request under 100K, so `/core:setup` no longer writes this setting.
 
 Side effect: after compaction, scout lost its place and re-read files until it hit `maxTurns`. This is one more reason to keep work orders small (§4.7). One order should stay well under ~80K.
+
+### Implement re-run after the test-filter fix (2026-10-09)
+Same tasks, a fresh clone, both arms run again the same day. The new arm uses the `/core:setup` settings without the compaction setting.
+
+| Repo | Old $ | New $ | Δ | Old s | New s | Turns old / new | Result |
+|---|---|---|---|---|---|---|---|
+| core | 0.140 | **0.125** | **−11%** (was +10%) | 58 | 127 | 8 / 10 (new was 12) | both green; new TDD (red first), +7 cases; old +10 |
+| legacy | 0.332 | **0.314** | **−5%** (was +12%) | 114 | 196 | 14 / 17 (new was 20) | both green; new TDD, 25 cases; old 33 |
+
+After the fix the main session no longer burns turns on a false `NO TESTS MATCHED`. With these implement numbers the 8-task total is **old $1.60 vs new $1.10 (−31%)**. The old arm itself varied between runs ($0.289 → $0.332 on legacy), so read single-run deltas of ±10% as noise. New stays slower in wall time because of the TDD loop.
