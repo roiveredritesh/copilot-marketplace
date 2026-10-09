@@ -75,7 +75,8 @@ build|test)
   else
     out=$(dotnet test "$target" --no-build -nologo -v q --logger 'console;verbosity=minimal' ${filter:+--filter "$filter"} 2>&1); rc=$?
   fi
-  echo "$out" | grep -qiE 'No test matches|No test is available' && { echo "STATUS: NO TESTS MATCHED${filter:+ (filter: $filter)}"; exit 0; }
+  # Other test projects in the solution print "No test matches" for a filter; it only matters when no assembly ran a test.
+  ! echo "$out" | grep -qE 'Passed!|Failed!|Total tests' && echo "$out" | grep -qiE 'No test matches|No test is available' && { echo "STATUS: NO TESTS MATCHED${filter:+ (filter: $filter)}"; exit 0; }
   summary=$(echo "$out" | grep -E 'Passed!|Failed!|Total tests|Passed:|Failed:' | tail -n 10)
   if [ $rc -ne 0 ]; then echo "STATUS: TESTS FAILED"; echo "$summary"; echo "$out" | condense '^\s*(Failed |Assert|Expected|Actual|at .* in .*:line|error )'
   else echo "STATUS: TESTS PASSED"; echo "$summary"; fi

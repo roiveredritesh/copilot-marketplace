@@ -453,3 +453,38 @@ The user asked for full SDLC coverage. Added to `dotnet`, all user-invoked:
 Verified: filtered test pass / no-match, coverage output, audit on the sample (1 deprecated, 4 outdated, 1 secret location), and a live `/dotnet:audit` run ($0.012, Haiku main). Observation: when the main model can call `dotnet.sh` directly, it may skip the runner. That's acceptable, since the script output is already condensed (≤ 40 lines), so a subagent spawn would cost about the same. The runner matters for outputs that need condensing beyond the script (git history, CI logs, psql).
 
 `core:scout` gained `WebSearch`/`WebFetch` (used only for the queries/URLs a work order lists, facts returned with source URLs, page instructions ignored). This avoided a separate researcher agent: one description less in the listing, and a shared cache prefix. Live check: a Polly facts work order returned sourced facts for **$0.037**.
+
+## 12. P4 benchmark: old (ab9197b) vs new (2026-10-09)
+
+Setup: public samples, with ground truth planted on the branches. **eShopOnWeb** (.NET 8, SDK-style, 74 tests) and **eShopLegacyWebForms** (.NET Framework 4.7.2, packages.config, EF6, no tests). Main model Sonnet 5.5, `--setting-sources project,local --strict-mcp-config` (the user's global plugins/MCPs excluded from both arms), $2 cap per run, fresh worktree per run. The new arm gets the `/core:setup` settings via `--settings`/`--agents`.
+
+| Task | Repo | Old $ | New $ | Δ cost | Old s | New s | Quality vs ground truth |
+|---|---|---|---|---|---|---|---|
+| review | core | 0.201 | **0.085** | **−58%** | 41 | 86 | both 4/4 planted bugs. New also ran tests (Haiku, $0.001) and reported the failing test |
+| review | legacy | 0.208 | **0.085** | **−59%** | 44 | 70 | both 4/4 |
+| debug | core | 0.173 | **0.067** | **−61%** | 57 | 51 | both found the interface change (CS7036), not the decoy commit |
+| debug | legacy | 0.139 | 0.125 | −10% | 40 | 52 | both found the `AvailableStock` rename |
+| spike | core | 0.158 | 0.184 | +16% | 59 | 82 | both found the existing `CachedCatalogViewModelService`. **New: 5 source URLs + 8 path:line; old: 0 URLs** |
+| spike | legacy | 0.251 | **0.116** | **−54%** | 65 | 81 | **old 3/4 (missed EF6), new 4/4**, 10 path:line |
+| implement | core | 0.143 | 0.158 | +10% | 69 | 159 | both green. New followed TDD (red first), 9 cases |
+| implement | legacy | 0.289 | 0.325 | +12% | 139 | 224 | both green and both created an MSTest project. New: TDD, 25 cases |
+| **Total** | | **1.562** | **1.145** | **−27%** | 514 | 805 | new ≥ old on every task |
+
+Plus the fixed per-request overhead (§10): +4,510 → +381 tokens. That saving applies to **every turn** of an interactive session, which these single-shot runs understate.
+
+### Findings and fixes from the benchmark
+- **Bugs found and fixed in `dotnet.sh`:**
+  - vswhere picked SSMS 22, so `-requires Microsoft.Component.MSBuild` is now passed.
+  - packages.config wasn't restored with `-restore`, so restore now runs as a separate `-t:restore` step.
+  - TFMs weren't read from `Directory.Packages.props`.
+  - The test summary was capped at 3 assemblies.
+  - **The test filter reported `NO TESTS MATCHED` in multi-project solutions.** Other test projects print "No test matches"; a bash precedence bug made that count. This cost implement-new extra turns. It's fixed and verified (match / no-match / unfiltered); implement wasn't re-measured.
+- The old commands **didn't fan out** to `general-purpose` agents in these runs (0 subagents). Sonnet ran the large command bodies inline, which is why the old cost was lower than feared.
+- The new arm's Haiku share was small ($0.069 of $1.145), but it did the web research (spike), the test runs (review), and the inventories. In implement and core-debug, the main session ran `dotnet.sh` itself instead of dispatching the runner. The cost is equivalent because the script output is pre-condensed (see §11).
+- New is **~57% slower** in wall time: the review runs tests, the spike does web research, and implement runs the TDD loops. Quality is the trade.
+- Each cell is a single run. Read the deltas as indicative, not statistically conclusive.
+
+### Work-order contract validation (§4.8, after the benchmark)
+- A vague scout order ("find whatever is causing the performance problems") returned `BLOCKED: work order missing scope`.
+- A vague runner order ("check the logs") returned `BLOCKED: work order missing steps`.
+- A scoped scout order returned 10 `path:line` citations, **10/10 verified exact** against the files.
