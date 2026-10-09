@@ -418,6 +418,16 @@ Skill invocation modes:
 - Live run: `claude -p "/dotnet:build test"` with the plugins loaded forked straight into `core:runner` on Haiku 5.5 and returned the condensed failure. **Cost: $0.0013**, with no main-model turns.
 - The modernize inventory commands, and the `gh ... --jq` release-notes command syntax.
 
+### Measured: fixed overhead per request (Sonnet 5.5, `claude -p "Reply with OK."`, 2026-10-09)
+| Setup | Input tokens per request | Plugin overhead |
+|---|---|---|
+| no plugins from this marketplace (your other global plugins/MCPs only) | 44,216 | — |
+| old 12 plugins (ab9197b) | 48,726 | **+4,510** |
+| new: all 5 plugins enabled | 44,770 | **+554** (−88%) |
+| new: core + dotnet (the typical .NET repo) | 44,597 | **+381** (−92%) |
+
+The ~44K baseline comes from other global plugins, MCPs, and CLAUDE.md, not from this marketplace. It's now the larger lever (see `/context`).
+
 ### Not yet verified (needs your environment or P4)
 - The legacy test path (`vstest.console.exe` on a packages.config test project). No such sample was available offline.
 - The PostgreSQL catalog/diagnostic SQL against a live server (no `psql` or database on this machine).
