@@ -12,7 +12,7 @@ This skill explores **what could be done**. `/dotnet:spike` checks facts about a
 Restate the goal in one sentence. Identify the mode: **feature ideas**, **design approaches**, **alternatives to existing code**, or **problem solving**. Then ask at most 3 questions in one AskUserQuestion call, only about what changes the options: users and goal, hard constraints (deadline, budget, tech it must or mustn't use, compatibility with .NET Framework), and how the options will be judged (speed, cost, risk, simplicity, scalability). Skip questions the input already answers.
 
 ## 2. Ground it in the code (only when existing code is involved)
-Dispatch `core:scout`: "scope: <dirs/globs for the area> | terms: <type names, routes, tables from the idea>. Return at most 40 lines: where the related behavior lives (path:line), the patterns and libraries already used for similar things, extension points (interfaces, DI registrations, events), and constraints (TFM, packages, DB). `not found` for anything absent."
+Don't search the code yourself: one `core:scout` order is cheaper and keeps your context small. Afterwards, open only the 1-2 `path:line` references that decide between options. Dispatch `core:scout`: "scope: <dirs/globs for the area> | terms: <type names, routes, tables from the idea>. Return at most 40 lines: where the related behavior lives (path:line), the patterns and libraries already used for similar things, extension points (interfaces, DI registrations, events), and constraints (TFM, packages, DB). `not found` for anything absent."
 For a quick external fact (does a library exist, is it maintained), one `core:scout` web order. Deep research belongs to `/dotnet:spike` later.
 
 ## 3. Diverge (main session)

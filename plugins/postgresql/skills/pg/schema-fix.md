@@ -14,12 +14,19 @@
 - Group the findings: **must fix** (data integrity, imminent overflow, float money), **should fix** (missing FK index, untrusted constraint, timestamp without time zone), **optional** (json, serial, char(n)).
 
 ## 3. Gate: AskUserQuestion
-Show `# | severity | object | problem | fix | lock/rewrite impact`. Use exactly these options: `Fix all` / `Fix some` ("type the numbers in Other") / `Report only` / `Cancel`. Ask a decision question for anything with a business choice: orphans (delete them, set NULL, or keep and skip the FK) and the time zone stored in `timestamp` columns.
+Show `# | severity | object | problem | fix | lock/rewrite impact`. Use exactly these options: `Fix all` / `Fix some` ("type the numbers in Other") / `Report only` / `Cancel`. Ask a decision question for anything with a business choice: the time zone stored in `timestamp` columns, and orphans. **Offer only actions that are valid for the column:** set NULL only when it is nullable (otherwise say it would also drop NOT NULL). The others are delete the rows, reassign them to an existing parent, or skip the FK.
 
 ## 4. Write the fix (never run it against the database)
 - **EF Core repo:** change the model (`HasIndex`, `HasColumnType("timestamptz")`, `HasPrecision(18, 2)`, `HasOne().WithMany().HasForeignKey()`), then `dotnet ef migrations add <Name>` if `dotnet-ef` is installed. If it isn't, hand-write the migration in the repo's migration style. Wrap the non-transactional steps in `migrationBuilder.Sql("...", suppressTransaction: true)`.
 - **SQL migration tool:** add the next file in its folder and naming scheme.
-- **Neither:** write `.reports/schema-fix-<yyyymmdd>/` with `00-precheck.sql`, `01-up.sql`, and `02-down.sql`.
+- **Neither:** write `.reports/schema-fix-<yyyymmdd>/`:
+  - `00-precheck.sql`: read-only.
+  - `01-up.sql`: one transaction, `BEGIN ... COMMIT`.
+  - `02-up-concurrently.sql`: only the `CONCURRENTLY` statements, each idempotent (`IF NOT EXISTS` / `IF EXISTS`).
+  - `03-down.sql`.
+
+  Before the first write, keep `.reports/` out of git: `p=$(git rev-parse --git-path info/exclude); grep -qx .reports/ "$p" 2>/dev/null || echo .reports/ >> "$p"`.
+- **Fail before changing anything.** `01-up.sql` starts with the precheck conditions as assertions, so a wrong assumption aborts the whole transaction: `DO $$ BEGIN IF (SELECT count(*) FROM ...) <> 0 THEN RAISE EXCEPTION 'precheck: ...'; END IF; END $$;`. Data fixes (orphans, nulls) go in the same transaction as the constraints that need them. A failure must leave the database either unchanged or with only the idempotent concurrent indexes added.
 
 Lock-safe patterns:
 
