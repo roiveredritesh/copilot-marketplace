@@ -10,8 +10,10 @@ disable-model-invocation: true
 If the goal, scope, or acceptance criteria are ambiguous, ask at most 3 questions in one AskUserQuestion call before mapping code.
 
 ## 2. Map the code: dispatch `core:scout` (one order; split into at most 3 parallel orders only for very large repos)
-"Return at most 50 lines: (a) entry points for <feature area> (controllers/endpoints/handlers/pages), (b) the domain/data types involved (path:line), (c) the closest existing feature to copy patterns from, (d) the test projects and an example test for that area."
+"scope: <src dirs or globs> | terms: <3-6 type names, routes, or keywords for the feature>. Return at most 50 lines: (a) entry points matching the terms (controllers/endpoints/handlers/pages), (b) the domain/data types involved (path:line), (c) the closest existing feature to copy patterns from, (d) the test projects and an example test for that area."
 Also run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/dotnet.sh" detect` yourself (it is about 8 lines).
+
+**Verify before you rely on it:** subagents only see the work order. Give them exact paths, symbols, and commands, never "look around". Before stating a subagent finding as fact in the report, open the 1-2 most decision-critical `path:line` references yourself (a small range each). Drop or label anything that doesn't check out.
 
 ## 3. Write the plan (chat)
 ```

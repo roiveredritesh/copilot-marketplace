@@ -26,13 +26,13 @@ fi
 
 legacy=$(echo "$projects" | while IFS= read -r p; do grep -qE '<Project[^>]*Sdk=|<Sdk ' "$p" || echo "$p"; done)
 tests=$(echo "$projects" | while IFS= read -r p; do grep -qiE 'xunit|nunit|MSTest|Microsoft\.NET\.Test\.Sdk' "$p" && echo "$p"; done)
-tfms=$(echo "$projects" | while IFS= read -r p; do grep -ohE '<TargetFrameworks?>[^<]+|<TargetFrameworkVersion>[^<]+' "$p"; done | sed 's/.*>//' | tr ';' '\n' | sort -u | tr '\n' ' ')
+tfms=$( { echo "$projects"; list '(^|/)Directory.(Build|Packages).props$'; } | while IFS= read -r p; do grep -ohE '<TargetFrameworks?>[^<]+|<TargetFrameworkVersion>[^<]+' "$p"; done | sed 's/.*>//' | tr ';' '\n' | sort -u | tr '\n' ' ')
 windows=no; case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) windows=yes;; esac
 
 vs_path() {
   local vswhere; vswhere="$(printenv 'ProgramFiles(x86)' || echo 'C:\Program Files (x86)')\Microsoft Visual Studio\Installer\vswhere.exe"
   [ -f "$vswhere" ] || return 1
-  "$vswhere" -latest -products '*' -property installationPath | tr -d '\r'
+  "$vswhere" -latest -products '*' -requires Microsoft.Component.MSBuild -property installationPath | tr -d '\r'
 }
 
 # Keep error/failure lines, strip "[project]" suffixes and repo-absolute prefixes, dedupe, cap.
@@ -54,7 +54,9 @@ build|test)
     [ "$windows" = no ] && { echo "STATUS: BLOCKED legacy .NET Framework projects need Windows + Visual Studio Build Tools"; exit 0; }
     vs=$(vs_path) || { echo "STATUS: BLOCKED vswhere not found; install Visual Studio Build Tools"; exit 0; }
     msbuild="$vs/MSBuild/Current/Bin/MSBuild.exe"
-    out=$("$msbuild" "$target" -restore -p:RestorePackagesConfig=true -m -nologo -v:q -clp:ErrorsOnly 2>&1); rc=$?
+    # Separate restore: "-restore" together with the build does not restore packages.config projects.
+    out=$("$msbuild" "$target" -t:restore -p:RestorePackagesConfig=true -nologo -v:q -clp:ErrorsOnly 2>&1) &&
+    out=$("$msbuild" "$target" -m -nologo -v:q -clp:ErrorsOnly 2>&1); rc=$?
   else
     out=$(dotnet build "$target" -nologo -v q -clp:'ErrorsOnly;NoSummary' 2>&1); rc=$?
   fi
@@ -74,7 +76,7 @@ build|test)
     out=$(dotnet test "$target" --no-build -nologo -v q --logger 'console;verbosity=minimal' ${filter:+--filter "$filter"} 2>&1); rc=$?
   fi
   echo "$out" | grep -qiE 'No test matches|No test is available' && { echo "STATUS: NO TESTS MATCHED${filter:+ (filter: $filter)}"; exit 0; }
-  summary=$(echo "$out" | grep -E 'Passed!|Failed!|Total tests|Passed:|Failed:' | tail -3)
+  summary=$(echo "$out" | grep -E 'Passed!|Failed!|Total tests|Passed:|Failed:' | tail -n 10)
   if [ $rc -ne 0 ]; then echo "STATUS: TESTS FAILED"; echo "$summary"; echo "$out" | condense '^\s*(Failed |Assert|Expected|Actual|at .* in .*:line|error )'
   else echo "STATUS: TESTS PASSED"; echo "$summary"; fi
   ;;
@@ -93,7 +95,14 @@ coverage)
   ;;
 audit)
   echo "STATUS: AUDIT"
-  if [ -n "$legacy" ] || list '(^|/)packages\.config$' | grep -q .; then echo "note: packages.config/legacy projects are not covered by 'dotnet list package' - migrate them to PackageReference"; fi
+  if [ -n "$legacy" ] || list '(^|/)packages\.config$' | grep -q .; then
+    # NuGet audit warnings from a packages.config restore (NU1901-NU1904 = low..critical).
+    if [ "$windows" = yes ] && vs=$(vs_path); then
+      rows=$("$vs/MSBuild/Current/Bin/MSBuild.exe" "$target" -t:restore -p:RestorePackagesConfig=true -nologo -v:m 2>&1 | grep -oE "warning NU190[1-4]: Package '[^']+' [^ ]+ has a known [a-z]+ severity" | sed -E "s/warning (NU190.): Package '([^']+)' ([^ ]+) has a known ([a-z]+) severity/\4 \2 \3 (\1)/" | awk '!seen[$0]++')
+      echo "vulnerable (packages.config): $(echo "$rows" | grep -c .)"; echo "$rows" | grep . | head -n 20 | sed 's/^/  /'
+    fi
+    echo "note: deprecated/outdated checks need PackageReference ('dotnet list package' skips packages.config)"
+  fi
   if [ "$(echo "$legacy" | grep -c .)" -lt "$(echo "$projects" | grep -c .)" ]; then
     dotnet restore "$target" -v q >/dev/null 2>&1
     for kind in vulnerable deprecated outdated; do

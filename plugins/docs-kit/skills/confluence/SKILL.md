@@ -14,11 +14,11 @@ From the arguments: doc type, target (a space key + optional parent id for a new
 ## 2. Gather facts with cheap agents (one message, parallel where independent)
 | Doc type | Work orders |
 |---|---|
-| api | `core:scout`: "list endpoints under <area>: route, HTTP verb, request/response type, auth attribute, path:line; at most 60 lines" |
+| api | `core:scout`: "scope: <API project dir> | terms: Map(Get|Post|Put|Delete), [Http*], [Route. List endpoints: route, HTTP verb, request/response type, auth attribute, path:line; at most 60 lines" |
 | adr | none, unless the decision references code: `core:scout` for the affected components |
-| runbook | `core:scout`: "list config keys (appsettings*, env vars), health check endpoints, background services, external dependencies (connection strings/HttpClient names), with path:line" |
+| runbook | `core:scout`: "scope: <host project dir>, appsettings*.json, Program.cs. List config keys (appsettings*, env vars), health check endpoints, background services, external dependencies (connection strings/HttpClient names), with path:line" |
 | release-notes | `core:runner` with the two commands below (at most 80 lines) |
-| qa-guide | `core:scout`: "for <feature>: UI inputs and validators (client and server, DataAnnotations), workflow branches and error paths, DB constraints that reject input, with path:line; at most 80 lines" |
+| qa-guide | `core:scout`: "scope: <dirs of the feature> | terms: <page/endpoint/type names>. For the feature: UI inputs and validators (client and server, DataAnnotations), workflow branches and error paths, DB constraints that reject input, with path:line; at most 80 lines" |
 
 Release-notes commands (the second one only when `gh` is authenticated):
 ```bash
@@ -27,6 +27,8 @@ gh pr list --state merged --search "merged:>=<yyyy-mm-dd>" --limit 100 --json nu
 ```
 
 Write only facts the agents returned or you verified. Mark anything assumed with "(to confirm)".
+
+**Verify before you rely on it:** subagents only see the work order. Give them exact paths, symbols, and commands, never "look around". Before stating a subagent finding as fact in the report, open the 1-2 most decision-critical `path:line` references yourself (a small range each). Drop or label anything that doesn't check out.
 
 ## 3. Write the page body once
 Use the matching structure in [templates.md](templates.md). Write it in Markdown to `~/.claude/reports/<repo-folder-name>/confluence-<slug>.md` with the Write tool. That one file is the payload. Don't repeat the body in chat; show a 5-line outline instead.

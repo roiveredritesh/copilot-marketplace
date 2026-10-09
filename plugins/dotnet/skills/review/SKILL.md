@@ -21,6 +21,8 @@ You (the main session) do the judging. Haiku agents only fetch and run things. K
 Read the diff file by file (`git diff $MB -- <file>`). Open surrounding code only when the hunk alone isn't enough. Apply [checklist.md](checklist.md).
 When a public signature, DTO, DB column, config key, or route changed, send `core:scout` a work order: "find callers/usages of <symbol> outside <changed files>; return path:line, at most 30 lines".
 
+**Verify before you rely on it:** subagents only see the work order. Give them exact paths, symbols, and commands, never "look around". Before stating a subagent finding as fact in the report, open the 1-2 most decision-critical `path:line` references yourself (a small range each). Drop or label anything that doesn't check out.
+
 ## 4. Report (chat; at most 60 lines)
 ```
 Verdict: approve | approve with nits | changes requested

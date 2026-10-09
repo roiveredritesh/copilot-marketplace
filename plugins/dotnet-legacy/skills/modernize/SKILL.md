@@ -18,6 +18,8 @@ return: the detect output, then "pattern count" lines (non-zero only), at most 4
 on-error: BLOCKED: <reason>
 ```
 
+**Verify before you rely on it:** subagents only see the work order. Give them exact paths, symbols, and commands, never "look around". Before stating a subagent finding as fact in the report, open the 1-2 most decision-critical `path:line` references yourself (a small range each). Drop or label anything that doesn't check out.
+
 ## 2. Pick the guidance
 | Situation | Read |
 |---|---|

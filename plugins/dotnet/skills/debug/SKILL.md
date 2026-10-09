@@ -21,6 +21,8 @@ List at most 3 hypotheses ranked by evidence. Verify the top one by reading the 
 
 For a regression, have `core:runner` search history: `git log -S'<symbol or literal>' --format='%h %ad %s' --date=short -- <path>` or `git log -L <start>,<end>:<file> --format='%h %s' -n 5 | grep -E '^[0-9a-f]{7} |^[+-][^+-]' | head -40`. Run `git bisect` only with the user's explicit OK, because it checks out commits.
 
+**Verify before you rely on it:** subagents only see the work order. Give them exact paths, symbols, and commands, never "look around". Before stating a subagent finding as fact in the report, open the 1-2 most decision-critical `path:line` references yourself (a small range each). Drop or label anything that doesn't check out.
+
 ## 4. Report (chat; at most 40 lines)
 ```
 Root cause: <one sentence>
