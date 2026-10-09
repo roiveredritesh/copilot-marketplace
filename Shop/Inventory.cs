@@ -15,5 +15,5 @@ public class Inventory
         _stock[sku] = available - quantity;
     }
 
-    public int Available(string sku) => _stock[sku];
+    public int Available(string sku) => _stock.GetValueOrDefault(sku);
 }
