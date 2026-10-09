@@ -43,6 +43,7 @@ To try the plugins from a local checkout before they reach `main`: `/plugin mark
 | Build / test | `/dotnet:build [build\|test]` |
 | Review | `/dotnet:review [base\|PR#]` |
 | Commit / PR | `/dotnet:pr [base] [--draft]` |
+| PR feedback | `/dotnet:pr-comments [PR#] [--draft-only]`: verify each unresolved comment, fix, draft replies, post after approval |
 | CI/CD | `/dotnet:ci triage [run\|PR#]` · `/dotnet:ci generate [github\|azure]` |
 | Security / deps | `/dotnet:audit`: vulnerable/deprecated/outdated NuGet, secret locations, framework support dates |
 | Debug / RCA | `/dotnet:debug <trace\|error\|failing test>` |
@@ -83,6 +84,7 @@ The full SDLC loop. Builds and tests go through `scripts/dotnet.sh`. It detects 
 | `/dotnet:review [base\|PR#]` | Reviews the branch or a GitHub PR for bugs, security issues, and breaking changes, while Haiku runs the tests in parallel. | `/dotnet:review main` or `/dotnet:review 42` |
 | `/dotnet:debug <trace\|error\|test>` | Root cause of an exception, stack trace, failing test, or bug report. Haiku locates the code and searches git history (which commit broke it). | `/dotnet:debug NullReferenceException at BasketService.cs:57` |
 | `/dotnet:pr [base] [--draft]` | Commits in the repo's message convention and opens a PR with a generated description. Asks once, showing the files, the commit message, the push target, and the PR; no PR option when `origin` isn't on GitHub. | `/dotnet:pr main --draft` |
+| `/dotnet:pr-comments [PR#] [--draft-only]` | Works through review feedback on a GitHub PR. Haiku fetches only the **unresolved** threads plus review and conversation comments (`gh api graphql`). Main reads the code at each `path:line` (reviewers can be wrong, outdated threads may already be fixed) and classifies every thread as **fix / answer / push back / defer / done**. You approve the table. Then it applies the fixes, runs the tests, and drafts one short reply per thread in `.reports/pr-<n>/`. Commit+push and posting replies each need a separate yes. Threads are resolved only when you ask. `--draft-only` never posts. | `/dotnet:pr-comments 42` |
 | `/dotnet:ci triage\|generate` | `triage`: Haiku condenses failed GitHub Actions or Azure DevOps logs to the failing step and error. `generate`: writes a CI pipeline for .NET Core or Framework. | `/dotnet:ci triage 42` · `/dotnet:ci generate github` |
 | `/dotnet:audit` | Vulnerable, deprecated, and outdated NuGet packages (including `packages.config`), likely committed secrets, and target-framework end-of-support dates, ranked by priority. | `/dotnet:audit` before a release |
 | `dotnet:guide` *auto* | EF Core (queries, migrations), ASP.NET Core (DI, middleware, HttpClient), async and C# performance. Loads only the one reference that matches the task. | Picked up automatically when you work on that kind of code. |
@@ -119,7 +121,7 @@ MCP calls run in the isolated Haiku `publisher`, so Atlassian tools never load i
 Pass a page URL or id instead of a space to update an existing page.
 
 ### Typical flows
-- **New feature, gated end to end:** `/dotnet:flow PROJ-1`. Approve after each step; `/clear` + `/dotnet:flow resume PROJ-1` between phases keeps the cost down.
+- **New feature, gated end to end:** `/dotnet:flow PROJ-1`. Approve after each step. After reviewers comment, run `/dotnet:flow resume PROJ-1` (or `/dotnet:pr-comments <PR#>`) to address the feedback. `/clear` + `/dotnet:flow resume PROJ-1` between phases keeps the cost down.
 - **New feature, step by step:** `/dotnet:analyze PROJ-1`, then `/dotnet:plan <analysis file>`, `/dotnet:implement`, `/dotnet:review`, and `/dotnet:pr`.
 - **Quick change, no TDD:** `/dotnet:implement --no-tdd <task>`, then `/dotnet:tests <target>` later if needed, and `/dotnet:pr`.
 - **Production bug:** `/dotnet:debug <stack trace>`, then `/dotnet:tests <fix area>` and `/dotnet:pr`.

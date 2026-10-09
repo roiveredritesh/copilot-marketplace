@@ -1,6 +1,6 @@
 ---
 name: flow
-description: Spec-driven SDLC in one command - analyze, (spike), plan, implement, (tests), review, pr - with an approval gate after every step and a resumable spec folder per ticket.
+description: Spec-driven SDLC in one command - analyze, (spike), plan, implement, (tests), review, pr, (PR comments) - with an approval gate after every step and a resumable spec folder per ticket.
 argument-hint: "<ISSUE-KEY | details> [--no-tdd] | resume <KEY or slug> | status <KEY or slug>"
 disable-model-invocation: true
 ---
@@ -23,6 +23,7 @@ Runs the SDLC skills of this plugin in order. You stop for the user's approval a
   - [ ] tests - code-first only
   - [ ] review
   - [ ] pr
+  - [ ] comments - after reviewers respond
   notes: <revision feedback, decisions at gates>
   ```
 
@@ -36,6 +37,7 @@ Runs the SDLC skills of this plugin in order. You stop for the user's approval a
 5. **tests** (code-first mode only): offer `skills/tests/SKILL.md` for the behaviors implement listed as untested. Skip it in TDD mode.
 6. **review**: `skills/review/SKILL.md` against the base branch. Fix high-severity findings only after the user approves them at the gate.
 7. **pr**: `skills/pr/SKILL.md`. It asks once more (commit + push + PR, commit only, edit, or cancel) before anything is committed. Put the analysis goal and acceptance criteria in the PR description.
+8. **comments** (later): once reviewers have commented, `/dotnet:flow resume <KEY>` runs `skills/pr-comments/SKILL.md` for the PR recorded at the pr step. Repeat per review round. The flow is done when the user says the PR is merged or closed.
 
 ## Gate after every step
 1. Update `progress.md` (step result plus any notes).
