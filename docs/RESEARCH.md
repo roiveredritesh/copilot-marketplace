@@ -158,11 +158,8 @@ Use the alias `haiku`, not a full model ID, so the plugin follows future Haiku r
 ```jsonc
 // ~/.claude/settings.json (approved: D7)
 {
-  "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "haiku" },        // any agent without a model pin → haiku
-  "modelSettings": {
-    "claude-haiku-5-5": { "autoCompactWindow": 100000 }    // §4.7: Haiku only, main session untouched (v2.1.288+)
-  }
-}
+  "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "haiku" }         // any agent without a model pin → haiku
+}                                                          // no compaction setting: the default already stays < 100K (§12)
 ```
 The built-in `Explore` agent ignores `CLAUDE_CODE_SUBAGENT_MODEL` and runs on the main model. To make Explore cheap, place a user-level override at `~/.claude/agents/Explore.md` with `model: haiku`. A plugin agent can't do this because plugin agents are namespaced (`dotnet:Explore`), so the file has to be user-level. Plugin `settings.json` can't set `env` (only `agent` and `subagentStatusLine`), so these values can't ship inside the plugin and must go in user settings.
 
@@ -205,7 +202,7 @@ Target: the fixed listing goes from **~5–6k → < 1k tokens** in a typical .NE
 
 | Context | Strategy |
 |---|---|
-| **Haiku workers** | **Primary: never reach 100K by design.** One work order per spawn, so every spawn starts fresh. `maxTurns` 6–12. Scripts condense output (errors only, `head -n`). The main session splits big jobs into chunks (per project, per folder, per 20 files). **Safety net (D10):** the per-model setting `modelSettings["claude-haiku-5-5"].autoCompactWindow = 100000` (§4.3). It applies only when Haiku is the model, so the main session's window is unchanged. Subagent compaction uses the same logic as the main conversation. Still, the docs don't explicitly say per-model settings apply inside subagents, so P1 verifies it once by checking `compact_boundary` / `preTokens` in a Haiku subagent transcript |
+| **Haiku workers** | **Primary: never reach 100K by design.** One work order per spawn, so every spawn starts fresh. `maxTurns` 6–12. Scripts condense output (errors only, `head -n`). The main session splits big jobs into chunks (per project, per folder, per 20 files). **Safety net (D10):** Claude Code's default compaction, which already keeps Haiku under 100K. The per-model `autoCompactWindow` setting was tested and has no effect (§12). It applies only when Haiku is the model, so the main session's window is unchanged. Subagent compaction uses the same logic as the main conversation. Still, the docs don't explicitly say per-model settings apply inside subagents, so P1 verifies it once by checking `compact_boundary` / `preTokens` in a Haiku subagent transcript |
 | **Main session** | Bounded worker returns (≤ 40 lines) keep the context small, so compaction is needed much less often. Skills end each phase with a 5-line state summary so `/compact` keeps what matters. Guidance in the README: `/clear` between unrelated tasks (cheapest), `/compact <focus>` at phase boundaries |
 | **Skill bodies after compaction** | Claude Code re-attaches the first 5k tokens of each invoked skill (25k total). Keeping skills ≤ 150 lines means they survive compaction intact |
 
@@ -383,7 +380,7 @@ Implementation note: P1–P3 are file-heavy but independent per plugin. They can
 | D7 | Global settings via setup | approved: `CLAUDE_CODE_SUBAGENT_MODEL=haiku`, Explore → Haiku override, Haiku `autoCompactWindow` |
 | D8 | Reports | **chat only**. `--save` writes a file outside the repo (or a gitignored folder) |
 | D9 | Benchmark | public sample repos (one .NET Core, one .NET Framework/WebForms) |
-| D10 | Haiku 100K compaction | `modelSettings["claude-haiku-5-5"].autoCompactWindow = 100000` + the design limits in §4.7 |
+| D10 | Haiku 100K compaction | ~~`modelSettings` autoCompactWindow~~ dropped: no effect, and the default already compacts Haiku below 100K (§12). Design limits in §4.7 stay |
 | D11 | MCP isolation | **full isolation**: user-level `publisher` with inline Atlassian (+ GitHub fallback). The servers are removed from the main config |
 | D12 | Atlassian MCP | official Atlassian remote server |
 | D13 | SQL Server / legacy scope | **SQL Server dropped** (LINQ-to-SQL, MSSQL query/schema tools, Telerik dropped too). `dotnet-legacy` keeps only **WebForms modernization** + **.NET Framework → .NET migration** |
@@ -432,7 +429,7 @@ The ~44K baseline comes from other global plugins, MCPs, and CLAUDE.md, not from
 - The legacy test path (`vstest.console.exe` on a packages.config test project). No such sample was available offline.
 - The PostgreSQL catalog/diagnostic SQL against a live server (no `psql` or database on this machine).
 - `/core:setup` end to end: the Atlassian/GitHub MCP servers aren't configured on this machine (`claude mcp list` shows neither), and whether the remote Atlassian OAuth works from a user-level agent with inline `mcpServers`.
-- Whether `modelSettings.claude-haiku-5-5.autoCompactWindow` applies inside subagents (check `compact_boundary` in a long Haiku subagent transcript).
+- ~~Whether `modelSettings.claude-haiku-5-5.autoCompactWindow` applies inside subagents~~ Answered in §12: it has no effect anywhere; the default is enough.
 - Model-driven skills (review/debug/plan/modernize/confluence) were checked by reading only. P4 measures them on public sample repos.
 
 ## 11. SDLC gap skills (added 2026-10-09)
@@ -488,3 +485,17 @@ Plus the fixed per-request overhead (§10): +4,510 → +381 tokens. That saving 
 - A vague scout order ("find whatever is causing the performance problems") returned `BLOCKED: work order missing scope`.
 - A vague runner order ("check the logs") returned `BLOCKED: work order missing steps`.
 - A scoped scout order returned 10 `path:line` citations, **10/10 verified exact** against the files.
+
+### Haiku compaction check (D10, 2026-10-09, Claude Code 2.1.295)
+Five 1,600-line files were read in 800-line chunks, about 25K tokens per read. Each arm also ran without the desktop app's inherited `CLAUDE_CODE_AUTO_COMPACT_WINDOW`.
+
+| Run | Setting | Compactions at preTokens | Largest Haiku request |
+|---|---|---|---|
+| scout subagent | none | 95.1K, 97.0K, 96.6K | 83.4K |
+| scout subagent | `autoCompactWindow` 60000 | 95.3K, 97.4K, 97.1K | 83.8K |
+| main session, Haiku | none | 100.8K, 99.1K, 99.1K | 87.3K |
+| main session, Haiku | `autoCompactWindow` 60000 | 100.8K, 99.5K, 99.5K | 87.3K |
+
+`modelSettings.<model>.autoCompactWindow` changed nothing: 60K and the default compact at the same point. The default already keeps every Haiku request under 100K, so `/core:setup` no longer writes this setting.
+
+Side effect: after compaction, scout lost its place and re-read files until it hit `maxTurns`. This is one more reason to keep work orders small (§4.7). One order should stay well under ~80K.
