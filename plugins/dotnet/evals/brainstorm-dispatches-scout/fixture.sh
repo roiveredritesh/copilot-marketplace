@@ -1,2 +1,4 @@
 #!/usr/bin/env bash
-bash "${BASH_SOURCE%/*}/../_fixture/shop.sh"
+# Windows passes this path with backslashes; normalize before taking the dirname.
+d=${BASH_SOURCE[0]//\\//}
+bash "${d%/*}/../_fixture/shop.sh"
