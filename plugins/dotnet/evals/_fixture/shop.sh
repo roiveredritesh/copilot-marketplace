@@ -63,4 +63,5 @@ public class OrderServiceTests
     [Fact] public async Task Place_rejects_zero_quantity() { /* ... */ await Task.CompletedTask; }
 }
 X
-git init -q && git -c user.name=eval -c user.email=eval@example.com add -A && git -c user.name=eval -c user.email=eval@example.com commit -qm "initial shop"
+g() { git -c core.autocrlf=false -c user.name=eval -c user.email=eval@example.com "$@"; }
+g init -q && g add -A && g commit -qm "initial shop"
