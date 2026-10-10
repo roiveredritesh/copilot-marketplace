@@ -31,4 +31,5 @@ Fix: <minimal change, as a short diff sketch>
 Test to add: <name + what it asserts>
 Confidence: high | medium (what would confirm it)
 ```
+Last line, always: `Steps: orders=<n dispatched> verified=<n refs opened> hypotheses=<n tested>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.
 With `--save`, also write it to `.reports/debug-<yyyymmdd-hhmm>.md` and print the path. Before the first write, keep `.reports/` out of git: `p=$(git rev-parse --git-path info/exclude); grep -qx .reports/ "$p" 2>/dev/null || echo .reports/ >> "$p"`.

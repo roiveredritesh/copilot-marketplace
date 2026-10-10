@@ -6,6 +6,8 @@ disable-model-invocation: true
 ---
 # Address PR review comments
 
+Start with TodoWrite: one item per numbered section below. Mark each done, or skipped with the reason, before moving on.
+
 No PR number: use the PR of the current branch (`gh pr view --json number --jq .number`).
 
 ## 1. Fetch everything to files: one `core:runner` work order
@@ -68,3 +70,4 @@ Reply style: 1-4 sentences, specific, no filler ("Great catch!"). For fixes, say
 
 ## 7. Report (at most 15 lines)
 Threads handled per class (and the total from the index, so nothing is silently missed), files changed, tests added (or untested behavior fixes when the user chose no tests), test STATUS, commit, replies posted (URLs) or the path of the drafts.
+Last line, always: `Steps: fetched=<n threads, n conversation items> gate=<asked: choice> tests=<asked: yes | no | not needed> fixes=<n applied> suite=<STATUS> commit=<hash | no> replies=<drafted n, posted n>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.

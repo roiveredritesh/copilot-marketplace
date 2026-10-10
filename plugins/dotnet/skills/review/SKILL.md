@@ -30,4 +30,5 @@ Build/tests: <runner STATUS line>
 | Sev | Location | Problem | Fix |
 ```
 Most severe first, real problems only (no style nits unless asked). End with "Not checked:" if any part was skipped.
+Last line, always: `Steps: scope=<base..head, n lines> dispatched=<scout, runner, reviewer as used> verified=<n refs opened>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.
 With `--save`, also write the report to `.reports/review-<branch-or-pr>-<yyyymmdd>.md` and print the path. Before the first write, keep `.reports/` out of git: `p=$(git rev-parse --git-path info/exclude); grep -qx .reports/ "$p" 2>/dev/null || echo .reports/ >> "$p"`.

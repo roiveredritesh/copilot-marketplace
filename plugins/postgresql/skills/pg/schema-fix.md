@@ -1,5 +1,7 @@
 # Schema audit and fix (live database)
 
+Start with TodoWrite: one item per numbered section below. Mark each done, or skipped with the reason, before moving on.
+
 ## 1. Audit: in ONE message, dispatch both
 - `core:runner`: `PGOPTIONS="-c default_transaction_read_only=on -c statement_timeout=30000" psql -X -A -t -F'|' -v ON_ERROR_STOP=1 -f "${CLAUDE_PLUGIN_ROOT}/skills/pg/audit.sql"` → return the rows as printed, at most 120 lines. It returns `severity|check|object|detail`.
 - `core:scout`: "scope: the whole repo | terms: DbContext, OnModelCreating, IEntityTypeConfiguration, Migrations/, .sql migration folders (Flyway V*__*.sql, DbUp, sqitch). Return at most 30 lines: the EF Core context and entity configuration files (path), the migrations folder, any SQL migration tool and its folder, and the Npgsql version from the .csproj."
@@ -48,3 +50,4 @@ Every up step gets a down step, or a note saying it can't be undone (data delete
 
 ## 5. Check the fix
 Review your own migration against [migration-safety.md](migration-safety.md). Then report: findings fixed or skipped, files written, the lock and rewrite impact of each step, and how to apply it (staging first). Offer a re-audit after the user applies it.
+Last line, always: `Steps: audit=<n findings> gate=<asked: choice> files=<paths> db-writes=none self-review=<done>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.

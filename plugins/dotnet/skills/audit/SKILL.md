@@ -33,3 +33,4 @@ An upgrade within modern .NET (8/9 → 10) means: bump the TFM and `global.json`
 
 ## 4. Report (at most 30 lines)
 A table: priority | finding | package/location | action. Then the top 3 next steps.
+Last line, always: `Steps: runner=<dispatched> tfm=<checked>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.

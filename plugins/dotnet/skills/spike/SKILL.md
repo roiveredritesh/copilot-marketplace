@@ -49,4 +49,5 @@ PoC result: <if run>
 Risks & unknowns: what is still unproven, and how to prove it
 Next steps: concrete, with a rough effort (S/M/L) - hand-off to /dotnet:plan
 ```
+Last line, always: `Steps: orders=<n dispatched> verified=<n refs opened> poc=<run | not needed>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.
 With `--save`, also write the report to `.reports/spike-<slug>-<yyyymmdd>.md`. With `--confluence <space>`, publish it through `/docs-kit:confluence spike <space> .reports/spike-<slug>-<yyyymmdd>.md` (needs docs-kit; `adr` instead once the decision is accepted). Before the first write, keep `.reports/` out of git: `p=$(git rev-parse --git-path info/exclude); grep -qx .reports/ "$p" 2>/dev/null || echo .reports/ >> "$p"`.

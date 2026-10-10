@@ -1,5 +1,7 @@
 # Schema audit and fix (live database)
 
+Start with TodoWrite: one item per numbered section below. Mark each done, or skipped with the reason, before moving on.
+
 ## 1. Audit: in ONE message, dispatch both
 - `core:runner`, two steps:
   1. `sqlcmd -S "<server>" -d <db> -E -b -h -1 -W -s "|" -t 60 -i "${CLAUDE_PLUGIN_ROOT}/skills/mssql/audit.sql"` → rows `severity|check|object|detail`, at most 120 lines.
@@ -50,3 +52,4 @@ Every up step gets a down step, or a note saying it can't be undone (deleted orp
 
 ## 5. Check the fix
 Review your own scripts against [migration-safety.md](migration-safety.md). Then report: findings fixed or skipped, files written, the lock and rebuild impact per step, the edition caveats, and how to apply (staging first, in a window when marked). Offer a re-audit after the user applies it.
+Last line, always: `Steps: audit=<n findings> gate=<asked: choice> files=<paths> db-writes=none self-review=<done>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.

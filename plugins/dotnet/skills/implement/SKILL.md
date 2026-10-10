@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Input: a plan (from `/dotnet:plan`, a file, or the conversation) or a single task. Without a plan, write a 3–7 step plan first (each step small, with its files and how it will be verified) and show it before starting.
 
-**Mode.** TDD is the default. Use **code-first** mode when the user passes `--no-tdd` or asks for it in words ("without TDD", "no tests first", "bina TDD"). State the mode in your first line.
+**Mode.** TDD is the default. Use **code-first** mode when the user passes `--no-tdd` or asks for it in words ("without TDD", "no tests first", "bina TDD"). State the mode in your first line. Then TodoWrite one item per plan step; mark a step done only after its runner check passes.
 
 ## TDD loop (default), one step at a time
 Make the test style known first: if this session hasn't seen the repo's tests yet, use step 1 of `/dotnet:tests` (the scout house-style order).
@@ -39,3 +39,4 @@ No new tests are written in this mode. At the end, list the behaviors left untes
 
 ## Finish (at most 15 lines)
 Mode, steps done, tests added (or behaviors left untested in code-first mode), final suite STATUS, open issues or follow-ups.
+Last line, always: `Steps: mode=<tdd | code-first> steps=<done>/<total> red-first=<n steps (tdd) | n/a> runner-checks=<n> final=<STATUS line>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.

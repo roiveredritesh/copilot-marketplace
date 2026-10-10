@@ -70,4 +70,5 @@ S / M / L with a one-line reason. Next: /dotnet:plan <this file>, or /dotnet:spi
 ```
 
 ## 5. Report (chat, at most 15 lines)
-Print the goal, the impacted areas (as one line each), the open questions, the size, and the file path. Don't repeat the whole file.
+Print the goal, the impacted areas (as one line each), the open questions, the size, and the file path. 
+Last line, always: `Steps: scout=<dispatched> runner=<dispatched> verified=<n refs opened> file=<path>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.

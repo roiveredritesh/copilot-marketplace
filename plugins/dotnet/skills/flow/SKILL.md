@@ -43,7 +43,7 @@ Runs the SDLC skills of this plugin in order. You stop for the user's approval a
 
 ## Gate after every step
 1. Update `progress.md` (step result plus any notes).
-2. Show at most 15 lines: what the step produced, key decisions, open questions or risks, and the artifact path. The user opens the file for the full text; don't paste it.
+2. Show at most 15 lines: what the step produced, key decisions, open questions or risks, and the artifact path. The user opens the file for the full text; don't paste it. Include the step skill's `Steps:` line as printed.
 3. Ask with one AskUserQuestion:
    - **Approve**: check the step off, then start the next one.
    - **Revise**: the user's feedback (from "Other" or a follow-up) goes into `notes`. Redo only this step and then come back to this gate.

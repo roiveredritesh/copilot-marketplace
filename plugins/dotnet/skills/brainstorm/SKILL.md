@@ -36,4 +36,5 @@ Next step, by what's left open:
 - Unknowns marked `(spike)` → `/dotnet:spike <question>`
 - A clear direction → `/dotnet:analyze .reports/brainstorm-<slug>.md` (or `/dotnet:flow`), then `/dotnet:plan`
 
-Chat output: at most 40 lines (options in short form, the matrix, the recommendation, the file path). The full detail lives in the file.
+Chat output: at most 40 lines (options in short form, the matrix, the recommendation, the file path). 
+Last line, always: `Steps: questions=<asked | not needed> scout=<dispatched | not needed (no existing code)> options=<n> choice=<asked> file=<path>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.

@@ -27,5 +27,5 @@ Data/migrations: schema changes and lock-safety (suggest `/postgresql:pg` or `/s
 Risks & rollback
 Test plan
 ```
-Prefer the repo's existing patterns over new abstractions. Every step lists the exact files. No step should leave the build broken.
+Prefer the repo's existing patterns over new abstractions. Every step lists the exact files. Last line, always: `Steps: scout=<dispatched> verified=<n refs opened> saved=<path | no>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.
 With `--save`, also write it to `.reports/plan-<slug>-<yyyymmdd>.md` and print the path. Before the first write, keep `.reports/` out of git: `p=$(git rev-parse --git-path info/exclude); grep -qx .reports/ "$p" 2>/dev/null || echo .reports/ >> "$p"`.

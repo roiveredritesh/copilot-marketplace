@@ -30,6 +30,7 @@ Show the files to stage, the commit message, and (unless `--commit-only`) the PR
 2. `git push -u origin <branch>`.
 3. `gh pr create --base <base> --title "<title>" --body-file <file> [--draft]`.
    If `gh` is unavailable or unauthenticated, send the same title/body to `publisher` (GitHub MCP) with the return `pr number | url`.
+4. Last line, always: `Steps: facts=<runner> confirm=<asked: choice> commit=<hash | no> push=<remote/branch | no> pr=<url | no>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.
 
 PR body template:
 ```

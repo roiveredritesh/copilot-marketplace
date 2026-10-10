@@ -29,3 +29,4 @@ At most 3 run/fix rounds, then report what remains.
 
 ## 5. Report (at most 20 lines)
 Tests added (file + names), the run's STATUS line, coverage before/after when measured, and any product bugs found.
+Last line, always: `Steps: style=<scout dispatched | known> run=<STATUS> rounds=<n> coverage=<measured | not asked>`. Fill every key; write `skipped (<reason>)` rather than leaving one out.
