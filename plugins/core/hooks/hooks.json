@@ -1,0 +1,13 @@
+{
+  "description": "Enforced guard: blocks database writes from psql/sqlcmd and asks before git push or GitHub writes.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/guard.sh\"", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}

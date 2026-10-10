@@ -1,7 +1,7 @@
 {
   "name": "core",
   "version": "3.0.0",
-  "description": "Cheap Haiku executors (scout, runner) and a Sonnet reviewer shared by every plugin in this marketplace, plus one-time cost setup.",
+  "description": "Cheap Haiku executors (scout, runner), a Sonnet reviewer, an enforced guard hook (no DB writes, ask before git push or GitHub writes), plus one-time cost setup.",
   "author": { "name": "Ritesh Tak" },
   "license": "MIT",
   "keywords": ["subagents", "haiku", "cost", "executors"]
