@@ -41,6 +41,8 @@ CASES = [
     ('sqlcmd -S "(localdb)\\\\MSSQLLocalDB" -d Shop -E -b -i "' + AUDIT_MS + '"', "allow"),
     ('sqlcmd -S . -d Shop -E -Q "SET NOCOUNT ON; BEGIN TRAN; SELECT COUNT(*) FROM dbo.Orders; ROLLBACK;"', "allow"),
     ('sqlcmd -S . -d Shop -E -Q "SELECT COUNT(*) FROM dbo.Orders"', "deny"),
+    # the mssql schema-fix edition query, exactly as the skill sends it
+    ('''sqlcmd -S "." -d Shop -E -b -h -1 -W -Q "SET NOCOUNT ON; BEGIN TRAN; SELECT CONCAT(CAST(SERVERPROPERTY('Edition') AS nvarchar(128)), ' | ', CAST(SERVERPROPERTY('ProductVersion') AS nvarchar(128))) FROM sys.databases WHERE name = DB_NAME(); ROLLBACK;"''', "allow"),
     ('sqlcmd -S . -d Shop -E -Q "BEGIN TRAN; DELETE dbo.Orders; COMMIT"', "deny"),
     ('sqlcmd -S . -d Shop -E -i 02-up.sql', "deny"),
     ("echo psql is great", "allow"),

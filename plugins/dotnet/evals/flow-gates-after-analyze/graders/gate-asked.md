@@ -1,5 +1,4 @@
 ---
-type: tool_used
-tool: AskUserQuestion
-input_match: Approve[\s\S]*Revise[\s\S]*Pause
+type: regex
+pattern: 'Approve[\s\S]*Revise[\s\S]*Pause'
 ---

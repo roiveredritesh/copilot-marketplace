@@ -5,7 +5,7 @@ Start with TodoWrite: one item per numbered section below. Mark each done, or sk
 ## 1. Audit: in ONE message, dispatch both
 - `core:runner`, two steps:
   1. `sqlcmd -S "<server>" -d <db> -E -b -h -1 -W -s "|" -t 60 -i "${CLAUDE_PLUGIN_ROOT}/skills/mssql/audit.sql"` → rows `severity|check|object|detail`, at most 120 lines.
-  2. `sqlcmd -S "<server>" -d <db> -E -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CONCAT(CAST(SERVERPROPERTY('Edition') AS nvarchar(128)), ' | ', CAST(SERVERPROPERTY('ProductVersion') AS nvarchar(128)), ' | compat ', compatibility_level) FROM sys.databases WHERE name = DB_NAME()"`
+  2. `sqlcmd -S "<server>" -d <db> -E -b -h -1 -W -Q "SET NOCOUNT ON; BEGIN TRAN; SELECT CONCAT(CAST(SERVERPROPERTY('Edition') AS nvarchar(128)), ' | ', CAST(SERVERPROPERTY('ProductVersion') AS nvarchar(128)), ' | compat ', compatibility_level) FROM sys.databases WHERE name = DB_NAME(); ROLLBACK;"` (the guard hook allows sqlcmd only inside a rolled-back transaction)
   Return both outputs as printed. `audit.sql` needs SQL Server 2017+ (STRING_AGG); on older versions it fails with a syntax error, and you say so.
 - `core:scout`: "scope: the whole repo | terms: DbContext, OnModelCreating, IEntityTypeConfiguration, Migrations/, .edmx, DbUp, *.sqlproj, .sql migration folders. Return at most 30 lines: the EF Core (or EF6) context and configuration files (path), the migrations folder, any SQL project or migration tool and its folder, and the EF provider and version from the project file."
 

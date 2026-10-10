@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Fake gh for evals: answers the pr-comments fetch from fixture files the case's scaffold put in
+# .git/eval-fake/, and logs every call. Writes to GitHub are logged as WRITE and never sent anywhere.
+d="$(git rev-parse --git-dir 2>/dev/null)/eval-fake"
+echo "gh $*" >> "$d/calls.log"
+a=" $* "
+case "$a" in
+  *" auth status "*) echo "Logged in to github.com account eval (fake)"; exit 0 ;;
+  *" repo view "*) echo "acme/shop"; exit 0 ;;
+esac
+if [[ "$a" == *" api "* && ( "$a" == *mutation* || "$a" =~ \ (-X|--method)\ ?(POST|PUT|PATCH|DELETE) || "$a" == *"/replies "* ) ]] ||
+   [[ "$a" =~ \ (pr|issue)\ (comment|create|merge|review|close|edit)\  ]]; then
+  echo "WRITE $*" >> "$d/calls.log"
+  echo "https://github.com/acme/shop/pull/$(cat "$d/pr")#fake"; exit 0
+fi
+case "$a" in
+  *" pr checkout "*) git checkout -q "$(cat "$d/head")"; exit 0 ;;
+  *"reviewThreads"*) cat "$d/threads.txt"; exit 0 ;;
+  *" pr view "*"reviews,comments"*) cat "$d/conversation.txt"; exit 0 ;;
+  *" pr view "*"--json number "*) cat "$d/pr"; exit 0 ;;
+  *" pr view "*) cat "$d/pr-line.txt"; exit 0 ;;
+  *" pr diff "*) git diff "main...$(cat "$d/head")"; exit 0 ;;
+esac
+echo "fake gh: unsupported in this eval: gh $*" >&2
+exit 1
