@@ -1,11 +1,18 @@
 {
-  "description": "Enforced guard: blocks database writes from psql/sqlcmd and asks before git push or GitHub writes.",
+  "description": "Enforced guards: block database writes and ask before git push or GitHub writes (Bash and PowerShell); check each skill's Steps line against the transcript.",
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/guard.sh\"", "timeout": 10 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/steps-check.sh\"", "timeout": 15 }
         ]
       }
     ]

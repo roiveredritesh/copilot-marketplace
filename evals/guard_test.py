@@ -47,6 +47,25 @@ CASES = [
     ("bash -c 'psql -f up.sql'", "deny"),
     ("cd db && psql -f up.sql", "deny"),
     ("rtk psql -c 'delete from t'", "deny"),
+    # PowerShell tool
+    ('& "C:\\Program Files\\PostgreSQL\\18\\bin\\psql.exe" -f 01-up.sql', "deny"),
+    ("& 'C:\\Program Files\\PostgreSQL\\18\\bin\\psql.exe' -f 01-up.sql", "deny"),
+    ("$env:PGOPTIONS='-c default_transaction_read_only=on'; psql -X -c 'select 1'", "allow"),
+    ("Invoke-Sqlcmd -ServerInstance . -Database Shop -Query 'DELETE dbo.Orders'", "deny"),
+    ('Invoke-Sqlcmd -ServerInstance . -Database Shop -InputFile "D:\\x\\plugins\\sqlserver\\skills\\mssql\\audit.sql"', "allow"),
+    ("Set-Location repo; git push origin main", "ask"),
+    ("Write-Output 'psql is great'", "allow"),
+    ('echo "psql rocks"', "allow"),
+    ('pwsh -Command "psql -f up.sql"', "deny"),
+    ('sh -c "sqlcmd -S . -i 02-up.sql"', "deny"),
+    # EF Core
+    ("dotnet ef database update", "deny"),
+    ("dotnet ef database drop --force", "deny"),
+    ("cd src/Shop.Api && dotnet ef database update --connection x", "deny"),
+    ("Update-Database -Context ShopDbContext", "deny"),
+    ("dotnet ef migrations add AddApprovalStatus", "allow"),
+    ("dotnet ef migrations script --idempotent -o up.sql", "allow"),
+    ("echo run dotnet ef database update later", "allow"),
 ]
 
 

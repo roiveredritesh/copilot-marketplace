@@ -1,6 +1,5 @@
 ---
 model: sonnet
-runs: 1
 tags: [regression]
 max_turns: 6
 allowed_tools: [Agent]

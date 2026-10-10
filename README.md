@@ -70,6 +70,8 @@ The shared executors that every other plugin dispatches to, plus the one-time se
 | `scout` agent (Haiku) | Read-only code and web search. It takes an exact work order and returns facts with `path:line` or URL. A vague order returns `BLOCKED: work order missing <field>`. | Skills use it to map code, find callers, and research libraries. You can also dispatch it: *"use core:scout: scope src/Orders/\*\*, terms OrderService, IOrderRepository; list callers with path:line"*. |
 | `runner` agent (Haiku) | Runs exact shell commands: git, gh, dotnet/msbuild, read-only psql. Returns condensed output only. | Builds, tests, git history, CI logs, DB queries. |
 | `reviewer` agent (Sonnet) | Reviews one chunk of a very large diff. | Only `/dotnet:review` uses it, when a diff is too big for one session. |
+| Guard hook (always on) | Before every Bash or PowerShell command: denies database writes (psql without read-only, sqlcmd/Invoke-Sqlcmd outside the audit or a rolled-back transaction, `dotnet ef database update/drop`, `dropdb`, `pg_restore`), and asks you before `git push` or any GitHub write, even when your settings allow it. `CLAUDE_ALLOW_DB_WRITES=1` turns the DB part off. It reads the command text, so a write hidden in a script file gets past it: keep DB permissions tight too. | Nothing to do. It costs no tokens. |
+| Steps check (always on) | When a skill ends, compares its `Steps:` line with what really happened: a claimed scout or runner dispatch needs a real Agent call, `gate=asked` a real question, `file=` an existing file, `TESTS PASSED` a real test result. A false claim sends Claude back once to do the step or correct the line. Needs Python 3.8+, otherwise it is skipped. | Nothing to do. |
 
 ### `dotnet`: every .NET repo (Core and Framework)
 The full SDLC loop. Builds and tests go through `scripts/dotnet.sh`. It detects SDK-style vs legacy projects, finds MSBuild through vswhere, restores `packages.config`, and prints only errors and failed tests.
@@ -184,4 +186,8 @@ The fixed overhead per request is **+381 tokens instead of +4,510**, and you pay
 - Optional: `psql` (PostgreSQL; found under `C:/Program Files/PostgreSQL/*/bin` when it isn't on PATH), `sqlcmd` (SQL Server), `gh` (GitHub PRs), the Atlassian remote MCP (docs-kit).
 
 ## Development
-`scripts/validate.sh` runs `claude plugin validate --strict` on the marketplace and every plugin. The design and the decisions behind it are in [docs/RESEARCH.md](docs/RESEARCH.md).
+`scripts/validate.sh` runs `claude plugin validate --strict` on the marketplace and every plugin.
+
+Tests:
+- Free, no model calls: `python evals/guard_test.py`, `python evals/steps_check_test.py`, `python evals/frontmatter_test.py`.
+- Behavior evals (cost model calls, 3 runs per case): `claude plugin eval plugins/core --scaffold --ablation none` and `claude plugin eval plugins/dotnet --scaffold --ablation none --allow-tools Write`. Add `--runs 1` for a quick check. They need a logged-in `claude` CLI (`claude auth login`). The design and the decisions behind it are in [docs/RESEARCH.md](docs/RESEARCH.md).
