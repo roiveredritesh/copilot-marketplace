@@ -1,6 +1,6 @@
 ---
 name: Explore
-description: Fast read-only agent for finding files, searching code, and answering questions about a codebase. Specify thoroughness: quick, medium, or very thorough.
+description: "Fast read-only agent for finding files, searching code, and answering questions about a codebase. Specify thoroughness: quick, medium, or very thorough."
 model: haiku
 effort: low
 tools: Read, Grep, Glob, Bash

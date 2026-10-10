@@ -26,8 +26,8 @@ Copy `${CLAUDE_PLUGIN_ROOT}/templates/Explore.md` to `~/.claude/agents/Explore.m
          headers:
            Authorization: "<same value as the existing config>"
    ```
-   If it isn't configured, drop the `{{GITHUB_SERVER}}` line.
-4. Write `~/.claude/agents/publisher.md` from `${CLAUDE_PLUGIN_ROOT}/templates/publisher.md`, filling `{{ATLASSIAN_URL}}` and `{{GITHUB_SERVER}}`.
+   Replace the `# {{GITHUB_SERVER}}` comment line with that entry. If GitHub isn't configured, leave the comment as is.
+4. Write `~/.claude/agents/publisher.md` from `${CLAUDE_PLUGIN_ROOT}/templates/publisher.md`, filling `{{ATLASSIAN_URL}}` and the GitHub line.
 5. Ask whether to remove the Atlassian and GitHub servers from the main session (`claude mcp remove <name> -s <scope>`). This is what keeps their tools out of every main-session request. Before removing, save the output of `claude mcp get <name>` to `~/.claude/mcp-backup-<yyyymmdd>.txt` with secrets redacted, and tell the user the re-add command (`claude mcp add ...`) in case the publisher cannot authenticate on its own.
 
 ## 4. Finish

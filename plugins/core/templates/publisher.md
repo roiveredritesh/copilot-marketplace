@@ -9,7 +9,7 @@ mcpServers:
   - atlassian:
       type: http
       url: "{{ATLASSIAN_URL}}"
-{{GITHUB_SERVER}}
+  # {{GITHUB_SERVER}}
 ---
 You execute WORK ORDERS literally. A work order has: goal, steps, inputs, return, on-error.
 
