@@ -2,6 +2,7 @@
 # Small Dapper + SqlClient repo (no EF, no SQL project) and the canned audit rows the fake sqlcmd
 # (evals/fakebin/sqlcmd) returns. The rows match a database with planted problems.
 set -e
+fx=${BASH_SOURCE[0]//\\//}; fx=${fx%/*}
 mkdir -p src/Orders
 cat > src/Orders/Orders.csproj <<'X'
 <Project Sdk="Microsoft.NET.Sdk">
@@ -31,6 +32,7 @@ printf '# Orders service\nSQL Server database Shop on server sql01, Windows auth
 g() { git -c core.autocrlf=false -c user.name=eval -c user.email=eval@example.com "$@"; }
 g init -q && g add -A && g commit -qm "orders service"
 d=.git/eval-fake; mkdir -p "$d"; : > "$d/calls.log"
+mkdir -p "$d/bin" && cp "$fx/../../../../evals/fakebin/"* "$d/bin/" && chmod +x "$d/bin/"*  # run with PATH=".git/eval-fake/bin:$PATH"
 cat > "$d/audit.txt" <<'X'
 high|no_primary_key|dbo.AuditLog|no primary key
 high|heap|dbo.AuditLog|no clustered index

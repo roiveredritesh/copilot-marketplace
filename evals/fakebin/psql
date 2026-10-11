@@ -4,8 +4,8 @@
 d="$(git rev-parse --git-dir 2>/dev/null)/eval-fake"
 echo "psql $* | PGOPTIONS=$PGOPTIONS" >> "$d/calls.log"
 a=" $* "
+[[ "$a" =~ \ (--version|-V)\  ]] && { echo "psql (PostgreSQL) 18.0"; exit 0; }  # case-sensitive: -v is a variable
 shopt -s nocasematch
-[[ "$a" =~ \ (--version|-V)\  ]] && { echo "psql (PostgreSQL) 18.0"; exit 0; }
 [[ "$PGOPTIONS" == *default_transaction_read_only=on* ]] || echo "NOT_READONLY $*" >> "$d/calls.log"
 if [[ "$a" =~ (^|[^a-z_])(insert|update|delete|alter|create|drop|truncate|grant|vacuum|reindex)[[:space:]] ]] && [[ "$a" != *audit.sql* ]]; then
   echo "DDL $*" >> "$d/calls.log"

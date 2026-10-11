@@ -2,8 +2,8 @@
 # Shop repo with PR #7 (feat/discounts) and its review threads, already rendered the way the
 # pr-comments fetch writes them. The fake gh (evals/fakebin/gh) serves these files.
 set -e
-d0=${BASH_SOURCE[0]//\\//}
-bash "${d0%/*}/shop.sh"
+fx=${BASH_SOURCE[0]//\\//}; fx=${fx%/*}
+bash "$fx/shop.sh"
 g() { git -c core.autocrlf=false -c user.name=dev1 -c user.email=dev1@example.com "$@"; }
 g branch -m main 2>/dev/null || true
 g checkout -qb feat/discounts
@@ -20,6 +20,7 @@ public class DiscountService
 X
 g add -A && g commit -qm "Add order discounts"
 d=.git/eval-fake; mkdir -p "$d"; : > "$d/calls.log"
+mkdir -p "$d/bin" && cp "$fx/../../../../evals/fakebin/"* "$d/bin/" && chmod +x "$d/bin/"*  # run with PATH=".git/eval-fake/bin:$PATH"
 echo 7 > "$d/pr"; echo feat/discounts > "$d/head"
 echo "7 Add order discounts | feat/discounts -> main | author dev1" > "$d/pr-line.txt"
 cat > "$d/threads.txt" <<'X'

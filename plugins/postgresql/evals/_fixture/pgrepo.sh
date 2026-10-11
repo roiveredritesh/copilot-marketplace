@@ -2,6 +2,7 @@
 # Small Dapper + Npgsql repo (no EF, no migration tool) and the canned audit rows the fake psql
 # (evals/fakebin/psql) returns. The rows match a database with planted problems.
 set -e
+fx=${BASH_SOURCE[0]//\\//}; fx=${fx%/*}
 mkdir -p src/Orders
 cat > src/Orders/Orders.csproj <<'X'
 <Project Sdk="Microsoft.NET.Sdk">
@@ -31,6 +32,7 @@ printf '# Orders service\nPostgreSQL, accessed with Dapper. Schema changes are a
 g() { git -c core.autocrlf=false -c user.name=eval -c user.email=eval@example.com "$@"; }
 g init -q && g add -A && g commit -qm "orders service"
 d=.git/eval-fake; mkdir -p "$d"; : > "$d/calls.log"
+mkdir -p "$d/bin" && cp "$fx/../../../../evals/fakebin/"* "$d/bin/" && chmod +x "$d/bin/"*  # run with PATH=".git/eval-fake/bin:$PATH"
 cat > "$d/audit.txt" <<'X'
 high|no_primary_key|public.audit_log|no primary key and no unique NOT NULL key
 high|fk_without_index|public.orders.customer_id|orders_customer_id_fkey has no index starting with (customer_id)
