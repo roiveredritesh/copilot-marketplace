@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: schema-fix-stops-at-gate
+tags: [regression, wsl]
+plugins: ["../..", "../../../core"]
+context:
+  scaffold_script: fixture.sh

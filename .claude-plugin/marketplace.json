@@ -1,96 +1,53 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "ritesh-marketplace",
-  "version": "2.0.0",
-  "description": "Local marketplace for Claude Code with 12 plugins, 43 agents, 43 commands, and 12 shared skills covering .NET/LINQ-to-SQL, database optimization, documentation, and modernization",
   "owner": {
-    "name": "Ritesh Tak",
-    "email": "ritesh@example.com"
+    "name": "Ritesh Tak"
+  },
+  "metadata": {
+    "version": "3.0.0",
+    "description": "Cost-optimized .NET (Core + Framework), PostgreSQL, and SQL Server plugins for Claude Code: thin skills that load only when invoked, Haiku executors for exploration, git, build/test, and MCP work."
   },
   "plugins": [
     {
-      "name": "analysis-toolkit",
-      "version": "2.0.0",
-      "description": "Root cause analysis, error investigation, issue diagnosis, and QA testing guide generation with shared skills integration",
-      "source": "./plugins/analysis-toolkit",
+      "name": "core",
+      "source": "./plugins/core",
+      "description": "Haiku executors (scout, runner), a Sonnet reviewer for large diffs, and one-time cost setup. Required by the other plugins.",
       "category": "development"
     },
     {
-      "name": "optimization-engine",
-      "version": "2.0.0",
-      "description": "Database query and algorithm optimization with shared performance tuning strategies and skills",
-      "source": "./plugins/optimization-engine",
+      "name": "dotnet",
+      "source": "./plugins/dotnet",
+      "description": "The full .NET SDLC for any repo (SDK-style and legacy .NET Framework): brainstorm, analyze, spike, plan, implement, tests, build, review, debug, PR and PR comments, CI, audit, plus a gated end-to-end flow.",
       "category": "development"
     },
     {
-      "name": "review-suite",
-      "version": "2.0.0",
-      "description": "Pull request and code review tools with shared skills integration",
-      "source": "./plugins/review-suite",
-      "category": "productivity"
+      "name": "postgresql",
+      "source": "./plugins/postgresql",
+      "description": "PostgreSQL query tuning, indexes, schema review, live schema audit with fix migrations, lock-safe migrations, and diagnostics via read-only psql.",
+      "category": "development",
+      "defaultEnabled": false
     },
     {
-      "name": "development-suite",
-      "version": "2.0.0",
-      "description": "Code generation, debugging, and refactoring tools with LINQ-to-SQL and technical writing skills",
-      "source": "./plugins/development-suite",
-      "category": "development"
+      "name": "sqlserver",
+      "source": "./plugins/sqlserver",
+      "description": "SQL Server live schema audit with fix migrations (EF Core or SQL) and migration safety review via read-only sqlcmd.",
+      "category": "development",
+      "defaultEnabled": false
     },
     {
-      "name": "architecture-advisor",
-      "version": "2.0.0",
-      "description": "Architecture analysis, design patterns, and .NET Framework modernization guidance",
-      "source": "./plugins/architecture-advisor",
-      "category": "development"
+      "name": "dotnet-legacy",
+      "source": "./plugins/dotnet-legacy",
+      "description": "WebForms and .NET Framework 4.x modernization: inventory, target choice, and phased migration plans.",
+      "category": "development",
+      "defaultEnabled": false
     },
     {
-      "name": "planning-suite",
-      "version": "2.0.0",
-      "description": "Comprehensive planning toolkit for detailed execution plans with code-level changes and analysis integration",
-      "source": "./plugins/planning-suite",
-      "category": "productivity"
-    },
-    {
-      "name": "brainstorming-suite",
-      "version": "2.0.0",
-      "description": "Ideation and brainstorming tools for feature exploration and problem-solving",
-      "source": "./plugins/brainstorming-suite",
-      "category": "productivity"
-    },
-    {
-      "name": "linq-to-sql-expert",
-      "version": "2.0.0",
-      "description": "LINQ-to-SQL optimization, bug fixing, and SQL stored procedure migration for .NET Framework applications",
-      "source": "./plugins/linq-to-sql-expert",
-      "category": "development"
-    },
-    {
-      "name": "root-cause-analyzer",
-      "version": "2.0.0",
-      "description": "Codebase-focused root cause analysis for bug patterns, regression identification, and error correlation",
-      "source": "./plugins/root-cause-analyzer",
-      "category": "development"
-    },
-    {
-      "name": "database-schema-analyzer",
-      "version": "2.0.0",
-      "description": "SQL Server schema analysis, migration planning, relationship mapping, and normalization analysis",
-      "source": "./plugins/database-schema-analyzer",
-      "category": "development"
-    },
-    {
-      "name": "confluence-document-creator",
-      "version": "2.0.0",
-      "description": "Automated technical documentation generation for Confluence (API docs, architecture docs, runbooks, release notes)",
-      "source": "./plugins/confluence-document-creator",
-      "category": "productivity"
-    },
-    {
-      "name": "telerik-control-expert",
-      "version": "2.0.0",
-      "description": "Telerik RadControls troubleshooting, migration to modern alternatives, and optimization for ASP.NET WebForms",
-      "source": "./plugins/telerik-control-expert",
-      "category": "development"
+      "name": "docs-kit",
+      "source": "./plugins/docs-kit",
+      "description": "Confluence pages (API docs, ADRs, runbooks, release notes, QA guides) from the codebase and Jira ticket intake via an isolated Haiku publisher.",
+      "category": "productivity",
+      "defaultEnabled": false
     }
   ]
 }
