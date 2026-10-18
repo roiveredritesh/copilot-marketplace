@@ -59,7 +59,7 @@ To try the plugins from a local checkout before they reach `main`: `/plugin mark
 
 ## Plugins in detail
 
-Each command below names who does the work. **Main** = your session model, which judges and writes code. **Haiku** = the `scout`/`runner` executors, which search, run commands, and condense output. **Every skill loads only when you invoke it** (`disable-model-invocation`): none of them sits in the default context. With all plugins enabled, the default overhead is about 325 tokens, which is the scout/runner/reviewer agent descriptions the skills dispatch to.
+Each command below names who does the work. **Main** = your session model, which judges and writes code. **Haiku** = the `scout`/`runner` executors, which search, run commands, and condense output. **Every skill loads only when you invoke it** (`disable-model-invocation`): none of them sits in the default context. With all plugins enabled, the default overhead is about 800 tokens: the scout/runner/reviewer agent descriptions (~375) plus the delegation policy (~420) that lets Claude use them without being asked.
 
 ### `core`: required everywhere
 The shared executors that every other plugin dispatches to, plus the one-time setup.
@@ -70,6 +70,7 @@ The shared executors that every other plugin dispatches to, plus the one-time se
 | `scout` agent (Haiku) | Read-only code and web search. It takes an exact work order and returns facts with `path:line` or URL. A vague order returns `BLOCKED: work order missing <field>`. | Skills use it to map code, find callers, and research libraries. You can also dispatch it: *"use core:scout: scope src/Orders/\*\*, terms OrderService, IOrderRepository; list callers with path:line"*. |
 | `runner` agent (Haiku) | Runs exact shell commands: git, gh, dotnet/msbuild, read-only psql. Returns condensed output only. | Builds, tests, git history, CI logs, DB queries. |
 | `reviewer` agent (Sonnet) | Reviews one chunk of a very large diff. | Only `/dotnet:review` uses it, when a diff is too big for one session. |
+| Delegation policy (always on) | At session start (and after `/clear` or compaction) a ~400-token note tells Claude to hand multi-file code/web lookups to `scout`, noisy shell output to `runner`, and very large diffs to `reviewer`, **without you naming them**, and to stay inline for a single grep or a short command. `CLAUDE_CORE_DELEGATION=0` turns it off. | Nothing to do. Without it, plain requests (no slash command) were answered inline on the main model: 0/3 vs 3/3 dispatches in the `delegates-without-being-named` eval. |
 | Guard hook (always on) | Before every Bash or PowerShell command: denies database writes (psql without read-only, sqlcmd/Invoke-Sqlcmd outside the audit or a rolled-back transaction, `dotnet ef database update/drop`, `dropdb`, `pg_restore`), and asks you before `git push` or any GitHub write, even when your settings allow it. `CLAUDE_ALLOW_DB_WRITES=1` turns the DB part off. It reads the command text, so a write hidden in a script file gets past it: keep DB permissions tight too. | Nothing to do. It costs no tokens. |
 | Steps check (always on) | When a skill ends, compares its `Steps:` line with what really happened: a claimed scout or runner dispatch needs a real Agent call, `gate=asked` a real question, `file=` an existing file, `TESTS PASSED` a real test result. A false claim sends Claude back once to do the step or correct the line. Needs Python 3.8+, otherwise it is skipped. | Nothing to do. |
 
@@ -159,7 +160,7 @@ Pass a page URL or id instead of a space to update an existing page.
 
 ## How cost is controlled
 1. **Model tiering.** Your main session (Sonnet 5.5 recommended) judges. Haiku executors do I/O at about 1/40 of the Opus 5.5 token price. Nothing pins Opus.
-2. **Small fixed overhead.** Every skill is user-invoked only (`disable-model-invocation`), so none of them costs anything until you call it. All plugins together add about 325 tokens per request. Guidance loads one reference file at a time.
+2. **Small fixed overhead.** Every skill is user-invoked only (`disable-model-invocation`), so none of them costs anything until you call it. All plugins together add about 800 tokens per request, ~420 of them the delegation policy (`CLAUDE_CORE_DELEGATION=0` removes it). Guidance loads one reference file at a time.
 3. **Bounded returns.** Executors return 30–40 lines max. Build and test output is condensed by `dotnet.sh` before any model sees it.
 4. **Cache-friendly.** Static agent and skill bodies, no inline model switches, MCP servers isolated in a subagent.
 5. **Reports go to chat.** Files (`--save`, analysis, flow specs) go to `.reports/` at the repo root. The skills add it to the repo's local git exclude, so nothing is committed by accident.
@@ -189,7 +190,7 @@ The fixed overhead per request is **+381 tokens instead of +4,510**, and you pay
 `scripts/validate.sh` runs `claude plugin validate --strict` on the marketplace and every plugin.
 
 Tests:
-- Free, no model calls: `python evals/guard_test.py`, `python evals/steps_check_test.py`, `python evals/frontmatter_test.py`.
+- Free, no model calls: `python evals/guard_test.py`, `python evals/steps_check_test.py`, `python evals/frontmatter_test.py`, `python evals/delegation_test.py`.
 - Behavior evals (cost model calls, 3 runs per case): `claude plugin eval plugins/core --scaffold --ablation none` and `claude plugin eval plugins --eval-dir dotnet/evals --scaffold --ablation none --allow-tools Write` (run against `plugins/` so a case can also load `core`). Add `--runs 1` for a quick check. They need a logged-in `claude` CLI (`claude auth login`).
 - Cases that need Bash (pr-comments, schema-fix) run in WSL or Linux, where the eval sandbox works. They use fake `gh`, `psql` and `sqlcmd` (from `evals/fakebin/`, copied into each case's workspace; the relative PATH entry finds them) that answer from fixtures, log every call, and flag GitHub writes, missing read-only and DDL, so no real PR or database is touched. Once per WSL install: `sudo apt-get install -y bubblewrap socat`, the native Linux `claude` (`curl -fsSL https://claude.ai/install.sh | bash`), and `claude auth login`. Then, from the repo:
   `PATH=".git/eval-fake/bin:$PATH" claude plugin eval plugins --eval-dir postgresql/evals --scaffold --ablation none --allow-tools Write Edit Bash --runs 1` (same with `sqlserver/evals`, and `dotnet/evals --tag wsl`). `bash evals/fakebin_test.sh` checks the fixtures and fakes for free. The design and the decisions behind it are in [docs/RESEARCH.md](docs/RESEARCH.md).

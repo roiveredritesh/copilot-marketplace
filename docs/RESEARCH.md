@@ -509,3 +509,22 @@ Same tasks, a fresh clone, both arms run again the same day. The new arm uses th
 | legacy | 0.332 | **0.314** | **−5%** (was +12%) | 114 | 196 | 14 / 17 (new was 20) | both green; new TDD, 25 cases; old 33 |
 
 After the fix the main session no longer burns turns on a false `NO TESTS MATCHED`. With these implement numbers the 8-task total is **old $1.60 vs new $1.10 (−31%)**. The old arm itself varied between runs ($0.289 → $0.332 on legacy), so read single-run deltas of ±10% as noise. New stays slower in wall time because of the TDD loop.
+
+## 13. Auto-delegation without naming the agent (2026-10-18)
+
+Problem: outside a slash command, Claude never used `scout`/`runner`. The user had to write "use core:scout". Causes: every skill is `disable-model-invocation`, so nothing in a plain session said when the executors beat inline work; the agent descriptions described the input contract ("Send a WORK ORDER", "Not for open-ended exploration") rather than when to use them; and both executors blocked any order without a return format, which is how ad-hoc dispatches are usually written.
+
+Changes:
+- `core` ships a `SessionStart` hook (`hooks/delegation.sh`, matchers `startup|clear|compact`) whose stdout is a short delegation policy: scout for lookups over ~3 files or several searches, runner for noisy shell output, reviewer for diffs over ~600 lines, inline for a single grep or a short command. It also says that `core:scout` in a skill means the Agent tool with that `subagent_type`. `CLAUDE_CORE_DELEGATION=0` disables it.
+- Agent descriptions start with "Use proactively for ..." (the trigger wording the subagent docs recommend).
+- scout and runner fall back to their default line-capped return when an order has none. They still block an order with no concrete scope or no runnable command (`scout-blocks-vague-order` still passes 2/2).
+
+Eval `core/evals/delegates-without-being-named` (Sonnet main, plain request to map Quantity/PlaceAsync usages, 3 runs each, Claude Code 2.1.302):
+
+| Variant | scout dispatched | $/run |
+|---|---|---|
+| before | 0/3 | 0.042 |
+| new descriptions only (hook stubbed out) | 0/3 | 0.045 |
+| descriptions + SessionStart policy | **3/3** | 0.066 |
+
+The hook is what moves it. On this 5-file fixture delegating costs more than doing it inline, because the spawn and the verification reads cost more than three greps. The saving shows on real repos, where inline search pulls whole files into the main context and every later turn re-reads them. Fixed overhead measured with `claude -p "Reply with OK."`: +418 input tokens per request with the hook (36,046 → 36,464), plus ~50 for the longer descriptions.

@@ -1,6 +1,14 @@
 {
-  "description": "Enforced guards: block database writes and ask before git push or GitHub writes (Bash and PowerShell); check each skill's Steps line against the transcript.",
+  "description": "Delegation policy at session start (use the Haiku executors without being asked); enforced guards: block database writes and ask before git push or GitHub writes (Bash and PowerShell); check each skill's Steps line against the transcript.",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/delegation.sh\"", "timeout": 5 }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell",

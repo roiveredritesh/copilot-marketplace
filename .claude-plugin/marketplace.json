@@ -5,7 +5,7 @@
     "name": "Ritesh Tak"
   },
   "metadata": {
-    "version": "3.0.0",
+    "version": "3.1.0",
     "description": "Cost-optimized .NET (Core + Framework), PostgreSQL, and SQL Server plugins for Claude Code: thin skills that load only when invoked, Haiku executors for exploration, git, build/test, and MCP work."
   },
   "plugins": [

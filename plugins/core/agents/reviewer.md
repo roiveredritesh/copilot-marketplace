@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Reviews one chunk of a large diff and returns ranked findings with path:line. Send the base ref, the exact file list for this chunk, and any focus notes. Used by review skills only when a diff is too large for the main session.
+description: Use proactively when a diff to review exceeds ~600 changed lines - reviews one chunk and returns ranked findings with path:line. Send the base ref, the exact file list for the chunk, and any focus notes.
 model: sonnet
 effort: medium
 maxTurns: 15
