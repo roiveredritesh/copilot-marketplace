@@ -112,9 +112,12 @@ def main():
             return  # already nudged once; never loop
         entries = scope(load(hook["transcript_path"]))
         # The hook can run before the final message reaches the transcript: prefer the text Claude Code hands over.
-        last = hook.get("last_assistant_message") or ""
-        m = re.search(r"Steps:\s*(.+)", last)
-        line = m.group(1).strip().strip("`").strip() if m else steps_line(entries)
+        # When it does, that text is the final message: never fall back to an older Steps line in a lagging transcript.
+        if "last_assistant_message" in hook:
+            m = re.search(r"Steps:\s*(.+)", hook.get("last_assistant_message") or "")
+            line = m.group(1).strip().strip("`").strip() if m else None
+        else:  # older Claude Code without the field
+            line = steps_line(entries)
         if not line:
             return
         bad = check(parse(line), entries, hook.get("cwd") or os.getcwd())

@@ -13,7 +13,11 @@ cat > "$t/bin/dotnet" <<'X'
 echo "$1 tries=$NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT" >> "$FAKE_LOG"
 case "$1" in
   restore) case "$FAKE_RESTORE" in
-    unreachable) echo "src/App/App.csproj : error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json."; exit 1;;
+    unreachable) echo "src/App/App.csproj : error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json."
+      echo "error :   The proxy tunnel request to proxy 'http://127.0.0.1:1/' failed with status code '403'."; exit 1;;
+    transient-once) if [ ! -f "$FAKE_LOG.once" ]; then : > "$FAKE_LOG.once"
+      echo "src/App/App.csproj : error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json."
+      echo "error :   An error occurred while sending the request. The response ended prematurely."; exit 1; fi; exit 0;;
     conflict) echo "src/App/App.csproj : error NU1605: Detected package downgrade: Foo from 2.0.0 to 1.0.0."; exit 1;;
     *) exit 0;; esac;;
   list) case "$FAKE_LIST" in
@@ -30,7 +34,8 @@ chmod +x "$t/bin/dotnet"
 run() { (cd "$t/repo" && PATH="$t/bin:$PATH" FAKE_LOG="$t/log" FAKE_RESTORE="$1" FAKE_BUILD="$2" bash "$script" build); }
 : > "$t/log"
 check "unreachable feed is a restore failure, named" "$(run unreachable ok)" "STATUS: RESTORE FAILED (package source unreachable: https://api.nuget.org/v3/index.json)"
-check "no build after a failed restore" "$(cat "$t/log")" "restore tries=2"
+check "definitive failure: one fast attempt" "$(cat "$t/log")" "restore tries=1"
+[ "$(grep -c '^restore' "$t/log")" = 1 ] && { pass=$((pass+1)); echo "ok    definitive failure is not retried"; } || { fail=$((fail+1)); echo "FAIL  definitive failure retried: $(grep -c '^restore' "$t/log") restores"; }
 [[ "$(cat "$t/log")" == *build* ]] && { fail=$((fail+1)); echo "FAIL  build ran after a failed restore"; } || { pass=$((pass+1)); echo "ok    build skipped after a failed restore"; }
 check "other restore errors are counted" "$(run conflict ok)" "STATUS: RESTORE FAILED (1 error lines)"
 check "compile error is a build failure" "$(run ok error)" "STATUS: BUILD FAILED (1 error lines)"
@@ -38,6 +43,10 @@ check "clean build" "$(run ok ok)" "STATUS: BUILD OK"
 [[ "$(cat "$t/log")" == *"BUILD WITHOUT --no-restore"* ]] && { fail=$((fail+1)); echo "FAIL  build restored again"; } || { pass=$((pass+1)); echo "ok    build uses --no-restore"; }
 : > "$t/log"; (cd "$t/repo" && PATH="$t/bin:$PATH" FAKE_LOG="$t/log" NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT=6 bash "$script" build >/dev/null)
 check "a user's own retry setting wins" "$(cat "$t/log")" "restore tries=6"
+: > "$t/log"; rm -f "$t/log.once"
+check "transient failure: retried with NuGet's own retries, then builds" "$(run transient-once ok)" "STATUS: BUILD OK"
+check "transient retry uses NuGet's default (no override)" "$(sed -n 2p "$t/log")" "restore tries="
+[ "$(sed -n 2p "$t/log")" = "restore tries=" ] && { pass=$((pass+1)); echo "ok    second restore has no retry override"; } || { fail=$((fail+1)); echo "FAIL  second restore: $(sed -n 2p "$t/log")"; }
 audit() { (cd "$t/repo" && PATH="$t/bin:$PATH" FAKE_LOG="$t/log" FAKE_RESTORE="$1" FAKE_LIST="$2" bash "$script" audit); }
 out=$(audit unreachable ok)
 check "audit: unreachable feed is INCOMPLETE, not clean" "$out" "STATUS: AUDIT INCOMPLETE (not checked: vulnerable deprecated outdated)"

@@ -40,7 +40,7 @@ condense() { root=$(pwd -W 2>/dev/null || pwd); tr '\\' '/' | sed -E 's/ \[[^]]*
 
 # A failed restore is a feed or network problem, not a code error: say so and stop.
 restore_failed() {
-  if echo "$1" | grep -qE 'NU1301|Unable to load the service index|proxy tunnel|Name or service not known|No such host|actively refused'; then
+  if echo "$1" | grep -qE "$NET_ERR"; then
     src=$(echo "$1" | grep -oE 'for source [^ ]+' | head -1 | cut -d' ' -f3 | sed 's/\.$//')
     echo "STATUS: RESTORE FAILED (package source unreachable${src:+: $src}) - a network or feed problem, not a code error"
   else
@@ -48,8 +48,18 @@ restore_failed() {
   fi
   echo "$1" | condense ': error |error NU'; exit 0
 }
-# One retry, not NuGet's default of several with backoff: an unreachable feed fails in seconds, not minutes.
-export NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT="${NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT:-2}"
+# Restore without NuGet's retries first, so a feed that is plainly unreachable fails in seconds, not minutes.
+# Only a definitive answer (401/403/407, DNS, refused) stops there; a failure that may be transient runs the
+# restore again with NuGet's normal retries, exactly as a plain `dotnet build` would. A user's own setting wins.
+NET_ERR='NU1301|Unable to load the service index|proxy tunnel|Name or service not known|No such host|actively refused|Connection refused'
+DEFINITIVE="status code '40[137]'|status code does not indicate success: 40[137]|Name or service not known|No such host|nodename nor servname|actively refused|Connection refused"
+try_restore() {  # sets $rout; returns the restore's status
+  rout=$(NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT="${NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT:-1}" "$@" 2>&1) && return 0
+  if echo "$rout" | grep -qE "$NET_ERR" && ! echo "$rout" | grep -qE "$DEFINITIVE"; then
+    rout=$("$@" 2>&1) && return 0
+  fi
+  return 1
+}
 
 case "$cmd" in
 detect)
@@ -68,10 +78,10 @@ build|test)
     vs=$(vs_path) || { echo "STATUS: BLOCKED vswhere not found; install Visual Studio Build Tools"; exit 0; }
     msbuild="$vs/MSBuild/Current/Bin/MSBuild.exe"
     # Separate restore: "-restore" together with the build does not restore packages.config projects.
-    out=$("$msbuild" "$target" -t:restore -p:RestorePackagesConfig=true -nologo -v:q -clp:ErrorsOnly 2>&1) || restore_failed "$out"
+    try_restore "$msbuild" "$target" -t:restore -p:RestorePackagesConfig=true -nologo -v:q -clp:ErrorsOnly || restore_failed "$rout"
     out=$("$msbuild" "$target" -m -nologo -v:q -clp:ErrorsOnly 2>&1); rc=$?
   else
-    out=$(dotnet restore "$target" -nologo -v q 2>&1) || restore_failed "$out"
+    try_restore dotnet restore "$target" -nologo -v q || restore_failed "$rout"
     out=$(dotnet build "$target" --no-restore -nologo -v q -clp:'ErrorsOnly;NoSummary' 2>&1); rc=$?
   fi
   if [ $rc -ne 0 ]; then
@@ -122,7 +132,7 @@ audit)
     body+="note: deprecated/outdated checks need PackageReference ('dotnet list package' skips packages.config)"$'\n'
   fi
   if [ "$(echo "$legacy" | grep -c .)" -lt "$(echo "$projects" | grep -c .)" ]; then
-    if rout=$(dotnet restore "$target" -nologo -v q 2>&1); then
+    if try_restore dotnet restore "$target" -nologo -v q; then
       for kind in vulnerable deprecated outdated; do
         extra=; [ $kind = vulnerable ] && extra=--include-transitive
         lout=$(dotnet list "$target" package --$kind $extra 2>&1); lrc=$?
@@ -135,7 +145,7 @@ audit)
         fi
       done
     else
-      why=$(echo "$rout" | grep -qE 'NU1301|Unable to load the service index|proxy tunnel' && echo "package source unreachable" || echo "$(echo "$rout" | grep -cE ': error ') restore errors")
+      why=$(echo "$rout" | grep -qE "$NET_ERR" && echo "package source unreachable" || echo "$(echo "$rout" | grep -cE ': error ') restore errors")
       body+="vulnerable, deprecated, outdated: NOT CHECKED (restore failed: $why)"$'\n'; missing+=" vulnerable deprecated outdated"
     fi
   fi

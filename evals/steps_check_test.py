@@ -76,6 +76,8 @@ def main():
          "Report.\n\nSteps: scout=dispatched runner=dispatched"),
         ("last_assistant_message honest", [CMD, agent("scout"), agent("runner"), say("working on it")], "allow",
          "Report.\n\nSteps: scout=dispatched runner=dispatched"),
+        ("final message without Steps, stale one in a lagging transcript", [CMD, say("Steps: runner=dispatched")], "allow",
+         "Anything else you want me to check?"),
     ]:
         got = run(entries, cwd, last=last[0] if last else None)
         failed += got != want
@@ -83,7 +85,7 @@ def main():
     got = run([CMD, say("Steps: runner=dispatched")], cwd, active=True)
     failed += got != "allow"
     print(f"{'ok  ' if got == 'allow' else 'FAIL'} allow {got:5} second stop never blocks (stop_hook_active)")
-    total = len(cases) + 3
+    total = len(cases) + 4
     print(f"\n{total - failed}/{total} passed")
     sys.exit(1 if failed else 0)
 
