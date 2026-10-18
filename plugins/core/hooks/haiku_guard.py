@@ -6,19 +6,22 @@ point), deny the call and have the agent return now with `not done:`. It never c
 its place, and no request crosses 100K.
 PreToolUse, Haiku subagents with a maxTurns: on the next-to-last turn, tell the agent its next reply must be
 the answer, so hitting the limit returns results instead of nothing.
-PreToolUse, Haiku main session with the 100K window set: compaction stays the safety net, but a Read that would
-push the prompt past 95K before compaction runs is denied with a smaller range to read instead.
+PreToolUse, Haiku main session with the 100K window set: compaction stays the safety net, but a call whose result
+would push the prompt past 95K before compaction runs is denied with a way to make it smaller: a Read gets a line
+range that fits, Bash a `| head`, an MCP or other tool a subagent that returns only what is needed.
 SessionStart (compact), Haiku main session: re-inject the user's request and the tool calls already made.
 
 Any error, a non-Haiku model, or CLAUDE_CORE_HAIKU_GUARD=0 means allow and print nothing."""
-import json, os, sys
+import json, os, re, sys
 
 BUDGET = int(os.environ.get("CLAUDE_CORE_HAIKU_BUDGET") or 60000)  # subagents: stop before compaction
 MAIN_LIMIT = 95000  # main session: what a prompt may reach before compaction runs
 READ_MAX = 25000  # Read refuses bigger results, so a result never exceeds this
 CHARS_PER_TOKEN = 1.9  # Haiku 5.5, measured: shell 1.9, Markdown 2.4, Python 2.6 (with Read line prefixes)
 # Bash/PowerShell: ~30K chars come back inline, larger output is saved to a file behind a ~2K preview
-ESTIMATE = {"Bash": 16000, "PowerShell": 16000, "Grep": 4000, "Glob": 1500, "WebFetch": 4000, "WebSearch": 3000}
+ESTIMATE = {"Bash": 16000, "PowerShell": 16000, "Grep": 4000, "Glob": 1500, "WebFetch": 4000, "WebSearch": 3000,
+            "Agent": 3000, "Edit": 1500, "Write": 500, "TodoWrite": 300, "AskUserQuestion": 500}
+LINE_TOKENS = 60  # per line of a `| head -n N` command's output
 IMAGE = 1600  # tokens per image block; its base64 in the transcript says nothing about its cost
 TAIL, QUICK = 4 << 20, 256 << 10  # PreToolUse reads QUICK first: most calls only need the model check
 
@@ -128,6 +131,12 @@ def estimate(use, cwd):
             return read_estimate(use.get("input") or {}, cwd)[0]
         except (OSError, ValueError, TypeError):
             return 2000
+    if use.get("name") in ("Bash", "PowerShell"):  # a command bounded by head/tail is estimated from its line count
+        m = re.search(r"\|\s*(?:head|tail|Select-Object\s+-(?:First|Last))\s+(?:-n\s*)?-?(\d+)\s*$", (use.get("input") or {}).get("command") or "")
+        if m:
+            return min(int(m.group(1)) * LINE_TOKENS, ESTIMATE["Bash"])
+    if (use.get("name") or "").startswith("mcp__"):  # Claude Code caps an MCP result at MAX_MCP_OUTPUT_TOKENS
+        return int(os.environ.get("MAX_MCP_OUTPUT_TOKENS") or 25000)
     return ESTIMATE.get(use.get("name"), 4000)
 
 
@@ -178,15 +187,24 @@ def pre_tool_use(hook):
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext":
                   f"Turn limit (core plugin turn counter): turn {turn} of this agent's maxTurns {limit} is done. "
                   f"The run is cut off after turn {limit}, so the next reply is the last one that reaches the caller."}}))
-    elif hook.get("tool_name") == "Read" and projected > MAIN_LIMIT and window_set():
-        try:
-            est, lines, raw = read_estimate(hook.get("tool_input") or {}, cwd)
-            room = max(MAIN_LIMIT - (projected - est), 2000)
-            fit = max(int(lines * room / max(raw, 1)), 20)
-        except (OSError, ValueError, TypeError):
-            fit = 200
-        deny(f"This read would bring the Haiku prompt to ~{projected // 1000}K tokens, past the 100K price tier, "
-             f"before compaction can run. Read a smaller range: at most {fit} lines from the same offset, then continue.")
+    elif projected > MAIN_LIMIT and size < MAIN_LIMIT - 10000 and hook.get("tool_name") != "Agent" and window_set():
+        # size already past ~85K means compaction isn't running at ~80K: denying couldn't help, so allow
+        tool = hook.get("tool_name") or ""
+        if tool == "Read":
+            try:
+                est, lines, raw = read_estimate(hook.get("tool_input") or {}, cwd)
+                room = max(MAIN_LIMIT - (projected - est), 2000)
+                fit = max(int(lines * room / max(raw, 1)), 20)
+            except (OSError, ValueError, TypeError):
+                fit = 200
+            how = f"Read a smaller range: at most {fit} lines from the same offset, then continue."
+        elif tool in ("Bash", "PowerShell"):
+            how = "Bound the output: end the command with `| head -n 100` (or write it to a file and Read a range), then continue."
+        else:
+            how = ("Make this call inside a subagent (Agent tool) that returns only the part you need, "
+                   "or ask the user to run /compact first.")
+        deny(f"This call's result could bring the Haiku prompt to ~{projected // 1000}K tokens, past the 100K price "
+             f"tier, before compaction can run. {how}")
 
 
 def text_of(content):

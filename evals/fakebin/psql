@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Fake psql for evals: returns the case's canned audit rows for audit.sql and simple answers for
-# verification SELECTs. Logs every call; flags NOT_READONLY and DDL so graders can fail the run.
+# Fake psql for evals: returns the case's canned audit rows for audit.sql and answers shaped like the
+# planted database for verification SELECTs (one per statement in a -c). Logs every call; flags NOT_READONLY and DDL so graders can fail the run.
 d="$(git rev-parse --git-dir 2>/dev/null)/eval-fake"
 echo "psql $* | PGOPTIONS=$PGOPTIONS" >> "$d/calls.log"
 a=" $* "
@@ -15,13 +15,38 @@ if [[ "$a" =~ -f\ +[^\ ]*\.sql ]] && [[ "$a" != *audit.sql* ]]; then
   echo "DDL (script) $*" >> "$d/calls.log"
   echo "ERROR:  cannot execute this in a read-only transaction" >&2; exit 1
 fi
-case "$a" in
-  *audit.sql*) cat "$d/audit.txt" ;;
-  *"not exists"*) echo 1 ;;                        # orphan count
-  *"is null"*) echo 0 ;;                           # null count before NOT NULL
-  *pg_total_relation_size*|*pg_size_pretty*) echo 16384 ;;
-  *count\(*) echo 0 ;;
-  *version*) echo "PostgreSQL 18.0 on x86_64-pc-linux-gnu" ;;
-  *) echo "fake psql: no canned answer, returning no rows" >&2 ;;
-esac
+# Verification SELECTs: one answer per statement, shaped like `psql -A -F'|'` output for the planted database.
+size() { case $1 in orders) echo "873046016|4200000";; order_lines) echo "2147483648|18000000";; products) echo "106496|1200";;
+  customers) echo "5242880|40000";; audit_log) echo "268435456|3100000";; tickets) echo "16384|90";; *) echo "16384|0";; esac; }
+cols() { case $1 in
+  audit_log) printf 'occurred_at|timestamp with time zone|NO|now()\nactor|text|NO|\naction|text|NO|\npayload|jsonb|YES|\n';;
+  orders) printf 'id|bigint|NO|\ncustomer_id|bigint|NO|\ncreated_at|timestamp without time zone|NO|now()\n';;
+  order_lines) printf 'id|bigint|NO|\norder_id|bigint|YES|\nproduct_id|integer|NO|\nquantity|integer|NO|\nunit_price|double precision|NO|\n';;
+  products) printf 'id|integer|NO|\nname|text|NO|\nprice|double precision|NO|\n';;
+  customers) printf "id|integer|NO|nextval('customers_id_seq'::regclass)\nemail|text|NO|\nprefs|json|YES|\n";;
+  tickets) printf "id|integer|NO|nextval('tickets_id_seq'::regclass)\nqty|integer|NO|\n";;
+esac; }
+answer() {
+  local q=" $1 " lbl t
+  lbl=$(grep -ioE "^ *select +'[a-z0-9_]+'" <<< "$1" | grep -oE "'[a-z0-9_]+'" | tr -d "'")
+  out() { if [ -n "$lbl" ]; then printf '%s|%s\n' "$lbl" "$1"; else echo "$1"; fi; }
+  tables=$(grep -oE "public\.[a-z_]+|'[a-z_]+'" <<< "$q" | tr -d "'" | sed 's/^public\.//' | sort -u)
+  case "$q" in
+    *information_schema.columns*) for t in $tables; do if [[ "$q" == *table_name,* ]]; then cols "$t" | sed "s/^/$t|/"; else cols "$t"; fi; done ;;
+    *pg_total_relation_size*|*pg_size_pretty*|*reltuples*) for t in $tables; do [ -n "$(cols "$t")" ] && echo "$t|$(size "$t")"; done ;;
+    *pg_get_indexdef*|*pg_index*)
+      echo "idx_customers_email|f|f|t|CREATE INDEX idx_customers_email ON public.customers USING btree (email)|"
+      echo "idx_customers_email_dup|f|f|t|CREATE INDEX idx_customers_email_dup ON public.customers USING btree (email)|" ;;
+    *"not exists"*) out 1 ;;                        # orphan count
+    *"is null"*) out 0 ;;                           # null count before NOT NULL
+    *min\(*|*max\(*) out "2019-03-01 08:12:00|2026-10-17 23:59:10" ;;
+    *count\(*) out 0 ;;
+    *timezone*|*server_version*|*version\(*) [[ "$q" == *timezone* ]] && out "18.0|UTC" || out "PostgreSQL 18.0 on x86_64-pc-linux-gnu" ;;
+    *) ;;                                           # no rows, as for any query that matches nothing
+  esac
+}
+if [[ "$a" == *audit.sql* ]]; then cat "$d/audit.txt"; exit 0; fi
+sql=""; prev=""; for arg in "$@"; do [ "$prev" = "-c" ] && sql+="$arg;"; prev=$arg; done
+IFS=';' read -ra stmts <<< "$sql"
+for st in "${stmts[@]}"; do [[ "$st" =~ [^[:space:]] ]] && answer "$st"; done
 exit 0

@@ -405,7 +405,7 @@ Where the build deviates from the plan above, and why:
 
 Skill invocation modes:
 - **`context: fork` into Haiku:** `dotnet:build`.
-- **Model-invocable (in the listing):** `dotnet:guide` (only on matching paths), `postgresql:pg`, `docs-kit:jira`.
+- **Model-invocable (in the listing):** `dotnet:guide` (only on matching paths), `postgresql:pg`, `docs-kit:jira`. *(Superseded: since 9c935fc every skill is user-invoked; `paths:` was removed from `dotnet:guide` in §17.)*
 - **User-invoked only (not in the listing):** `dotnet:review`, `dotnet:debug`, `dotnet:plan`, `dotnet-legacy:modernize`, `docs-kit:confluence`, `core:setup`.
 
 ### Verified
@@ -587,8 +587,19 @@ The projections before each main-session compaction were ~92K, about what the co
 | No official eval covered the guard | — | `scout-stops-at-context-budget`, `scout-answers-at-turn-limit` | 2/2 + 3/3, 9/9 |
 | `scout-runs-full-order` was flaky | A/B on 4 runs each: original scout prompt 2/4, current 4/4; the failing answers were correct (all three files with line numbers), and the Haiku LLM judge split FAIL FAIL PASS | Exact-line regex graders replace the LLM judge (`OrdersController.cs:9-11`, `OrderService.cs:8`, `ShopDbContext.cs:13`) | 4/4 |
 
-Still open, by design or low value:
+Still open, by design or low value (all four resolved in §17):
 - A main Haiku session's MCP results (up to 25K tokens) aren't limited, so near compaction one could push the compaction request just past 100K. MCP output can't be asked to shrink, and this marketplace routes MCP through `publisher`, a subagent the budget covers.
 - The Haiku-window check reads user, project and local settings files only. A window passed with `--settings` or in managed settings gets a false "not set" note, and the main-session read rule stays off (fail-open).
 - The dotnet, postgresql and sqlserver evals still use LLM judges for some graders (e.g. `cites-code`, `triage-correct`), with the same flakiness risk.
 - `dotnet:guide` has `paths:` and `disable-model-invocation: true` together. The `paths:` gate is dead: the skill loads only through `/dotnet:guide`.
+
+## 17. The four open items, resolved (2026-10-18)
+
+| Item | Fix | Verified |
+|---|---|---|
+| MCP results in a main Haiku session weren't limited | The main-session rule covers every tool. MCP is estimated at `MAX_MCP_OUTPUT_TOKENS` (default 25K). A Read gets a line range, Bash `\| head -n 100` (a command already ending in `\| head/tail -n N` is estimated from N, so the retry passes), and MCP or other tools a subagent. Agent is never denied. If the last request is already past ~85K, compaction isn't running, so the guard allows instead of denying every call. | `haiku_guard_test` 29/29 |
+| The window check saw only the three settings files | It also reads the session's `--settings` (inline JSON, a file path, or `--settings=`), from the nearest `claude` process's argv: exact via `/proc` on Linux/WSL, best-effort via `ps` on macOS. An outer claude's flags are ignored. It also reads `managed-settings.json` plus `managed-settings.d/*.json` in the system directory and the cached server-managed `~/.claude/remote-settings.json`, in precedence order. MDM profiles and the Windows registry are still not read. | `haiku_window_test` 25/25; live: no note with `--settings` as a file or inline, note without |
+| LLM judges in the dotnet/postgresql evals | `pr-comments` triage: 7 row-level regexes on the gate table (path:line + class cell). pg gate: 3 regexes (unused index kept and never in a `DROP INDEX`, orphans never set to NULL on a NOT NULL column). analyze: `tool_used: Write` input matches (the old `focus: {file: glob}` grader **threw on every run**, because file targets don't take globs). brainstorm: matrix, recommendation and `options=` regexes, plus one LLM grader kept for "options differ in kind", run with `--judge-model sonnet`. Each new grader was checked against a real passing output, and mutation-tested to FAIL when its fact was broken (10/10). | analyze 2/2, brainstorm 2/2, pr-comments 2/2, pg gate 4/4 |
+| `dotnet:guide` `paths:` | Measured: a `paths:` skill adds 0 tokens at session start, but on 2.1.302 it never entered the skill listing, even after `.cs` files were read (comma-string and YAML-list forms, 2 Sonnet + 2 Haiku runs). Removed as dead config. `implement` and `review` already read the guide's references directly. | — |
+
+Found while doing this: the fake `psql` had no answers for the verification queries `schema-fix.md` prescribes (columns, sizes, index definitions, time zone, date ranges). Sonnet then inspected the stub and in one run refused to reach the gate, which made the pg gate case flaky. It now answers each statement in a `-c` in `psql -A -F'|'` shape, with the label column the skill's queries use, and returns no rows (not a "no canned answer" message) for anything else. Pg gate 4/4 with no run mentioning a stub; `schema-fix-writes-safe-scripts` 2/2; `fakebin_test` 29/29. A `controller` regex in `scout-runs-full-order` was too narrow (a correct answer cited `OrdersController.cs:8-10`); it now accepts lines 8-12 or a range ending there, 4/4.

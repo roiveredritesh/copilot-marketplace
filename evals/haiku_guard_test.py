@@ -29,7 +29,7 @@ def run(tmp, rows, hook, sub=None, env=None):
     with open(os.path.join(cfg, "settings.json"), "w") as f:
         json.dump({"modelSettings": {"haiku": {"autoCompactWindow": 100000}}}, f)
     e = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE_CORE_HAIKU") and k != "CLAUDE_CODE_AUTO_COMPACT_WINDOW"}
-    e.update(CLAUDE_CONFIG_DIR=cfg, CLAUDE_PROJECT_DIR=tmp, **(env or {}))
+    e.update(CLAUDE_CONFIG_DIR=cfg, CLAUDE_PROJECT_DIR=tmp, CLAUDE_CORE_MANAGED_SETTINGS_DIR=os.path.join(tmp, "managed"), **(env or {}))
     r = subprocess.run(["bash", HOOK], input=json.dumps(hook), capture_output=True, text=True, env=e, timeout=10)
     return r.returncode, r.stdout
 
@@ -81,6 +81,18 @@ def main():
              + [assistant("m11", H, 15100, [read_big[:2] + ({"file_path": small},)])], pre("Read", {"file_path": small}), "a1", None, "Turn limit"),
             ("sub: turn 10 of 12 silent", [assistant(f"m{i}", H, 15000 + i, [(f"t{i}", "Read", {"file_path": small})]) for i in range(1, 10)]
              + [assistant("m10", H, 15100, [read_big[:2] + ({"file_path": small},)])], pre("Read", {"file_path": small}), "a1", None, ""),
+            # main session, other tools: each gets a remedy that can actually shrink its result
+            ("main: MCP call near compaction", [assistant("m1", H, 72000, [("t9", "mcp__jira__getIssue", {"key": "A-1"})])],
+             pre("mcp__jira__getIssue", {"key": "A-1"}), None, None, "subagent"),
+            ("main: MCP call with room", [assistant("m1", H, 40000, [("t9", "mcp__jira__getIssue", {"key": "A-1"})])],
+             pre("mcp__jira__getIssue", {"key": "A-1"}), None, None, ""),
+            ("main: unbounded Bash near compaction", [assistant("m1", H, 82000, [("t9", "Bash", {"command": "git log"})])],
+             pre("Bash", {"command": "git log"}), None, None, "head -n"),
+            ("main: Bash bounded by head", [assistant("m1", H, 82000, [("t9", "Bash", {"command": "git log | head -n 100"})])],
+             pre("Bash", {"command": "git log | head -n 100"}), None, None, ""),
+            ("main: Agent is never denied", [assistant("m1", H, 84000, [("t9", "Agent", {"subagent_type": "core:scout"})])],
+             pre("Agent", {"subagent_type": "core:scout"}), None, None, ""),
+            ("main: past 85K, compaction not running", [assistant("m1", H, 88000, [read_big])], pre("Read", {"file_path": big}), None, None, ""),
             ("main: compacted since last request", [assistant("m1", H, 72000, [("t1", "Read", {"file_path": big})]),
                                                      user([{"type": "tool_result", "tool_use_id": "t1", "content": "y" * 40000}]),
                                                      {"type": "system", "subtype": "compact_boundary"}],

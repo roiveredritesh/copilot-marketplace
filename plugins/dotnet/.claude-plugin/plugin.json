@@ -1,6 +1,6 @@
 {
   "name": "dotnet",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Build, test, review, debug, and plan for any .NET repo - SDK-style (.NET Core/5+) and legacy .NET Framework - with Haiku executors doing the I/O.",
   "author": { "name": "Ritesh Tak" },
   "license": "MIT",

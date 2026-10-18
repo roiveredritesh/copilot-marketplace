@@ -42,7 +42,7 @@ def main():
             if project is not None:
                 write(os.path.join(proj, ".claude", "settings.json"), project)
             env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_CODE_AUTO_COMPACT_WINDOW", "CLAUDE_CORE_HAIKU_CHECK")}
-            env.update(CLAUDE_CONFIG_DIR=cfg, CLAUDE_PROJECT_DIR=proj, **extra)
+            env.update(CLAUDE_CONFIG_DIR=cfg, CLAUDE_PROJECT_DIR=proj, CLAUDE_CORE_MANAGED_SETTINGS_DIR=os.path.join(tmp, "managed"), **extra)
             r = subprocess.run(["bash", HOOK], capture_output=True, text=True, env=env, timeout=10)
             noted = "Cost note" in r.stdout
             ok = r.returncode == 0 and noted == expect and (noted or r.stdout == "")
@@ -56,13 +56,45 @@ def main():
         with tempfile.TemporaryDirectory() as tmp:
             write(os.path.join(tmp, "agents", "Explore.md"), body)
             write(os.path.join(tmp, "settings.json"), OK)
-            env = dict(os.environ, CLAUDE_CONFIG_DIR=tmp, CLAUDE_PROJECT_DIR=tmp)
+            env = dict(os.environ, CLAUDE_CONFIG_DIR=tmp, CLAUDE_PROJECT_DIR=tmp, CLAUDE_CORE_MANAGED_SETTINGS_DIR=os.path.join(tmp, "m"))
             env.pop("CLAUDE_CODE_AUTO_COMPACT_WINDOW", None)
             out = subprocess.run(["bash", HOOK], capture_output=True, text=True, env=env, timeout=10).stdout
             ok = ("Setup note" in out) == expect and "Cost note" not in out
             failed += not ok
             CASES.append(name)
             print(("ok    " if ok else "FAIL  ") + f"{name}: {'note' if 'Setup note' in out else 'silent'}")
+    # settings beyond the three files: the claude process's --settings, managed settings, cached server-managed settings
+    BIG = {"modelSettings": {"haiku": {"autoCompactWindow": 500000}}}
+    for name, setup, expect in [
+        ("--settings inline JSON", lambda t: (["--settings", json.dumps(OK)], {}), False),
+        ("--settings file path", lambda t: (write(os.path.join(t, "s.json"), OK) or ["--settings", os.path.join(t, "s.json")], {}), False),
+        ("--settings=inline form", lambda t: (["--settings=" + json.dumps(OK)], {}), False),
+        ("--settings beyond the nearest claude ignored", lambda t: (["claude", "--settings", json.dumps(OK)], {"inner_claude": True}), True),
+        ("managed-settings.json", lambda t: (write(os.path.join(t, "managed", "managed-settings.json"), OK) or [], {}), False),
+        ("managed-settings.d drop-in", lambda t: (write(os.path.join(t, "managed", "managed-settings.d", "20-haiku.json"), OK) or [], {}), False),
+        ("managed raises the window above user", lambda t: (write(os.path.join(t, "cfg", "settings.json"), OK) or
+                                                            write(os.path.join(t, "managed", "managed-settings.json"), BIG) or [], {}), True),
+        ("server-managed (remote-settings.json)", lambda t: (write(os.path.join(t, "cfg", "remote-settings.json"), OK) or [], {}), False),
+    ]:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "cfg"), exist_ok=True)
+            args, opt = setup(tmp)
+            env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_CODE_AUTO_COMPACT_WINDOW", "CLAUDE_CORE_HAIKU_CHECK")}
+            env.update(CLAUDE_CONFIG_DIR=os.path.join(tmp, "cfg"), CLAUDE_PROJECT_DIR=tmp, CLAUDE_CORE_MANAGED_SETTINGS_DIR=os.path.join(tmp, "managed"))
+            run = ["bash", HOOK]
+            if opt.get("inner_claude"):  # outer process with --settings, then a nested `claude` process without them
+                inner = os.path.join(tmp, "claude")
+                write(inner, '#!/usr/bin/env bash\nbash "$HOOK"\n')
+                os.chmod(inner, 0o755)
+                env["HOOK"] = HOOK
+                run = [sys.executable, "-c", f"import subprocess; subprocess.run([{inner!r}])", "--settings", json.dumps(OK)]
+            elif args:  # a parent process whose argv carries --settings, like `claude --settings ...`
+                run = [sys.executable, "-c", f"import subprocess; subprocess.run(['bash', {HOOK!r}])"] + args
+            out = subprocess.run(run, capture_output=True, text=True, env=env, timeout=10).stdout
+            ok = ("Cost note" in out) == expect
+            failed += not ok
+            CASES.append(name)
+            print(("ok    " if ok else "FAIL  ") + f"{name}: {'note' if 'Cost note' in out else 'silent'}")
     print(f"\n{len(CASES) - failed}/{len(CASES)} passed")
     sys.exit(1 if failed else 0)
 
