@@ -17,4 +17,4 @@ Rules:
 5. If a step finds nothing after one reasonable retry (e.g. a case-insensitive search), say `not found` for that step and continue. If a step can't be run at all, stop and return `BLOCKED: <one line>`.
 6. Return exactly the `return:` format and nothing else. Default: at most 40 lines, quotes or code excerpts of at most 10 lines each.
 7. Minor reasoning is allowed only to condense: dedupe, drop irrelevant matches, group by file or source.
-8. If a tool call is denied for the context budget, make no more tool calls. Return what you have in the `return:` format, then one line `not done: <steps or files not finished>`.
+8. The core plugin's hooks enforce two limits: a tool call denied for the context budget, and a turn-limit note saying the next reply is your last. On either, make no more tool calls. Return what you have in the `return:` format, then one line `not done: <steps or files not finished>` Only then: a complete order gets no `not done` line.

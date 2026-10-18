@@ -571,3 +571,24 @@ Live runs (same 20-read fixture as §14, `modelSettings.haiku.autoCompactWindow:
 | scout, window + guard | denied at 64K projected; returned `not done: data1.txt offset 801 onward, data2-5` | 0 | 43K | **none** | $0.007 |
 
 The projections before each main-session compaction were ~92K, about what the compaction request really carries with ~20K reads. So the gap was real, and the 95K cap closes it with ~5K left for the summary prompt. Core evals afterwards: delegates-without-being-named 1/1, scout-blocks-vague-order 1/1, scout-runs-full-order 2/3 (one run's LLM judge failed the answer; the 2 re-runs passed).
+
+## 16. Remaining gaps closed (2026-10-18)
+
+| Gap | Evidence | Fix | Verified |
+|---|---|---|---|
+| An executor that hits `maxTurns` returns nothing | §14 arm C: "hit its 12-turn limit… no MARKER lines" | The guard counts the subagent's requests against `maxTurns` from its agent file. On the next-to-last turn it adds a factual note ("turn 11 of 12, the next reply is the last"); the agent's own rule says what to do. | eval `scout-answers-at-turn-limit` 4/4 + 3/3 + 2/2 (11 of 15 markers plus `not done: f12…f15`, $0.004/run) |
+| Haiku ignored that note as a prompt injection when the note held the instruction ("it came from inside the tool output… I'm ignoring it") | first version, 1/2 then 2/3 | The hook states only the fact. The instruction lives in the system prompt of scout, runner, publisher and Explore, which the agent trusts. The budget deny already worked this way. | as above |
+| Without `/core:setup`, the main-session read limit fired forever (Haiku compacts at ~967K, so every Read past 95K was denied) | code reading | The main-session rule runs only when `haiku_window.check()` finds the 100K window set | `haiku_guard_test` "window not set" |
+| An image read counted as its base64 size (~100K+), so the next call was falsely denied | code reading | Image blocks count 1,600 tokens | `haiku_guard_test` "image result" |
+| The Bash estimate (10K) was below the real cap | measured: up to ~25K chars inline (one char per token for repeated characters), larger output saved behind a 2.3K preview | 16K | — |
+| The "smaller range" line count came from a capped estimate | code reading | Uses the uncapped estimate | — |
+| ~110 ms per tool call in every session (4 MB transcript parse) | timed on a 2.4 MB transcript | A 256 KB tail first; non-Haiku sessions exit after the model check | ~45 ms per call |
+| User-level Explore/publisher from an older `/core:setup` lacked the new rules, unnoticed | code reading | The SessionStart check flags our templates (by their text) that lack the context-budget rule | `haiku_window_test` 17/17 |
+| No official eval covered the guard | — | `scout-stops-at-context-budget`, `scout-answers-at-turn-limit` | 2/2 + 3/3, 9/9 |
+| `scout-runs-full-order` was flaky | A/B on 4 runs each: original scout prompt 2/4, current 4/4; the failing answers were correct (all three files with line numbers), and the Haiku LLM judge split FAIL FAIL PASS | Exact-line regex graders replace the LLM judge (`OrdersController.cs:9-11`, `OrderService.cs:8`, `ShopDbContext.cs:13`) | 4/4 |
+
+Still open, by design or low value:
+- A main Haiku session's MCP results (up to 25K tokens) aren't limited, so near compaction one could push the compaction request just past 100K. MCP output can't be asked to shrink, and this marketplace routes MCP through `publisher`, a subagent the budget covers.
+- The Haiku-window check reads user, project and local settings files only. A window passed with `--settings` or in managed settings gets a false "not set" note, and the main-session read rule stays off (fail-open).
+- The dotnet, postgresql and sqlserver evals still use LLM judges for some graders (e.g. `cites-code`, `triage-correct`), with the same flakiness risk.
+- `dotnet:guide` has `paths:` and `disable-model-invocation: true` together. The `paths:` gate is dead: the skill loads only through `/dotnet:guide`.

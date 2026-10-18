@@ -48,6 +48,21 @@ def main():
             ok = r.returncode == 0 and noted == expect and (noted or r.stdout == "")
             failed += not ok
             print(("ok    " if ok else "FAIL  ") + f"{name}: {'note' if noted else 'silent'}")
+    # an Explore/publisher installed by an older /core:setup is flagged; the current templates and the user's own are not
+    tpl = os.path.join(ROOT, "plugins", "core", "templates")
+    old = "---\nname: Explore\nmodel: haiku\n---\nYou are a read-only codebase search agent. Find it.\n"
+    for name, body, expect in [("older template", old, True), ("current template", open(os.path.join(tpl, "Explore.md")).read(), False),
+                               ("user's own Explore", "---\nname: Explore\n---\nMy own agent.\n", False)]:
+        with tempfile.TemporaryDirectory() as tmp:
+            write(os.path.join(tmp, "agents", "Explore.md"), body)
+            write(os.path.join(tmp, "settings.json"), OK)
+            env = dict(os.environ, CLAUDE_CONFIG_DIR=tmp, CLAUDE_PROJECT_DIR=tmp)
+            env.pop("CLAUDE_CODE_AUTO_COMPACT_WINDOW", None)
+            out = subprocess.run(["bash", HOOK], capture_output=True, text=True, env=env, timeout=10).stdout
+            ok = ("Setup note" in out) == expect and "Cost note" not in out
+            failed += not ok
+            CASES.append(name)
+            print(("ok    " if ok else "FAIL  ") + f"{name}: {'note' if 'Setup note' in out else 'silent'}")
     print(f"\n{len(CASES) - failed}/{len(CASES)} passed")
     sys.exit(1 if failed else 0)
 

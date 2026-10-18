@@ -24,8 +24,12 @@ def run(tmp, rows, hook, sub=None, env=None):
     with open(path, "w") as f:
         f.write("\n".join(json.dumps(r) for r in rows) + "\n")
     hook = dict(hook, transcript_path=main, cwd=tmp, **({"agent_id": sub, "agent_type": "core:scout"} if sub else {}))
-    e = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE_CORE_HAIKU")}
-    e.update(env or {})
+    cfg = os.path.join(tmp, "cfg")  # the 100K Haiku window is set unless a case says otherwise
+    os.makedirs(cfg, exist_ok=True)
+    with open(os.path.join(cfg, "settings.json"), "w") as f:
+        json.dump({"modelSettings": {"haiku": {"autoCompactWindow": 100000}}}, f)
+    e = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE_CORE_HAIKU") and k != "CLAUDE_CODE_AUTO_COMPACT_WINDOW"}
+    e.update(CLAUDE_CONFIG_DIR=cfg, CLAUDE_PROJECT_DIR=tmp, **(env or {}))
     r = subprocess.run(["bash", HOOK], input=json.dumps(hook), capture_output=True, text=True, env=e, timeout=10)
     return r.returncode, r.stdout
 
@@ -66,6 +70,17 @@ def main():
             ("main: lagging, small total allowed", [assistant("m1", H, 30000, [("t1", "Read", {"file_path": small})]),
                                                     user([{"type": "tool_result", "tool_use_id": "t1", "content": "y" * 2000}])],
              pre("Read", {"file_path": big}), None, None, ""),
+            ("main: window not set, no read limit", [assistant("m1", H, 78000, [read_big])], pre("Read", {"file_path": big}), None,
+             {"CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"}, ""),
+            ("sub: image result counts as an image", [assistant("m1", H, 30000, [("t1", "Read", {"file_path": "x.png"})]),
+                                                      user([{"type": "tool_result", "tool_use_id": "t1", "content": [
+                                                          {"type": "image", "source": {"type": "base64", "data": "A" * 400000}}]}])],
+             pre("Read", {"file_path": small}), "a1", None, ""),
+            # scout has maxTurns 12: warn on turn 11 so turn 12 returns the results
+            ("sub: turn 11 of 12 warns", [assistant(f"m{i}", H, 15000 + i, [(f"t{i}", "Read", {"file_path": small})]) for i in range(1, 11)]
+             + [assistant("m11", H, 15100, [read_big[:2] + ({"file_path": small},)])], pre("Read", {"file_path": small}), "a1", None, "Turn limit"),
+            ("sub: turn 10 of 12 silent", [assistant(f"m{i}", H, 15000 + i, [(f"t{i}", "Read", {"file_path": small})]) for i in range(1, 10)]
+             + [assistant("m10", H, 15100, [read_big[:2] + ({"file_path": small},)])], pre("Read", {"file_path": small}), "a1", None, ""),
             ("main: compacted since last request", [assistant("m1", H, 72000, [("t1", "Read", {"file_path": big})]),
                                                      user([{"type": "tool_result", "tool_use_id": "t1", "content": "y" * 40000}]),
                                                      {"type": "system", "subtype": "compact_boundary"}],
@@ -99,7 +114,8 @@ def main():
                 code, out = r.returncode, r.stdout
             ok = code == 0 and ((expect in out) if expect else out == "")
             if ok and expect and hook["hook_event_name"] == "PreToolUse":
-                ok = json.loads(out)["hookSpecificOutput"]["permissionDecision"] == "deny"
+                decision = json.loads(out)["hookSpecificOutput"].get("permissionDecision")
+                ok = decision is None if expect == "Turn limit" else decision == "deny"
             failed += not ok
             print(("ok    " if ok else "FAIL  ") + name + ("" if ok else f"  -> {out[:200]!r}"))
     print(f"\n{n - failed}/{n} passed")

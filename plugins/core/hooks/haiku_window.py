@@ -32,15 +32,46 @@ def problem(env, files):
     return f"the Haiku auto-compact window is {window or 'not set'}"
 
 
-def main():
-    if os.environ.get("CLAUDE_CORE_HAIKU_CHECK", "1") == "0":
-        return
-    home = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
-    proj = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+# text only our templates have, and a line only the current versions have (see templates/)
+TEMPLATES = {"Explore.md": "You are a read-only codebase search agent", "publisher.md": "You execute WORK ORDERS literally"}
+CURRENT = "context budget"
+
+
+def home_dir():
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
+
+def check():
+    """The Haiku window problem for this session's settings, or None."""
+    home, proj = home_dir(), os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     files = [load(os.path.join(home, "settings.json")),
              load(os.path.join(proj, ".claude", "settings.json")),
              load(os.path.join(proj, ".claude", "settings.local.json"))]
-    p = problem(os.environ, files)
+    return problem(os.environ, files)
+
+
+def stale_templates():
+    """User-level agents installed by an older /core:setup (ours by their text, but without the current rules)."""
+    out = []
+    for name, ours in TEMPLATES.items():
+        try:
+            with open(os.path.join(home_dir(), "agents", name), encoding="utf-8") as f:
+                text = f.read()
+        except OSError:
+            continue
+        if ours in text and CURRENT not in text:
+            out.append(name)
+    return out
+
+
+def main():
+    if os.environ.get("CLAUDE_CORE_HAIKU_CHECK", "1") == "0":
+        return
+    stale = stale_templates()
+    if stale:
+        print(f"Setup note (core plugin), worth one line to the user: ~/.claude/agents/{', '.join(stale)} came from "
+              f"an older /core:setup and lacks the context-budget rule. Re-running /core:setup updates it.")
+    p = check()
     if p:
         print(f"Cost note (core plugin), worth one line to the user: {p}, so Haiku sessions and subagents can grow "
               f"past 100K tokens, where Haiku 5.5 bills 5x. /core:setup sets modelSettings.haiku.autoCompactWindow "
