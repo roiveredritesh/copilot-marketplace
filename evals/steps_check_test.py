@@ -28,10 +28,13 @@ def say(text):
     return {"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}
 
 
-def run(entries, cwd, active=False):
+def run(entries, cwd, active=False, last=None):
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as f:
         f.write("\n".join(json.dumps(e) for e in entries))
-    payload = json.dumps({"hook_event_name": "Stop", "transcript_path": f.name, "cwd": cwd, "stop_hook_active": active})
+    hook = {"hook_event_name": "Stop", "transcript_path": f.name, "cwd": cwd, "stop_hook_active": active}
+    if last is not None:
+        hook["last_assistant_message"] = last
+    payload = json.dumps(hook)
     out = subprocess.run(["bash", HOOK], input=payload, capture_output=True, text=True).stdout.strip()
     os.unlink(f.name)
     return "block" if out and json.loads(out).get("decision") == "block" else "allow"
@@ -60,15 +63,28 @@ def main():
         ("no Steps line", [CMD, say("Here is a plain answer.")], "allow"),
         ("Steps line not in the final message", [CMD, say("Steps: runner=dispatched"), say("Anything else?")], "allow"),
     ]
+    cases += [  # seen on a real repo: verifying through the shell, and a final message not yet in the transcript
+        ("verified with sed and git show", [CMD, agent("scout"), tool("Bash", command="sed -n 30,36p src/OrderService.cs"),
+                                            tool("Bash", command="git show 84a42a7 | head -40"), tool("Grep", pattern="Guard", output_mode="content"),
+                                            say("Steps: scout=dispatched verified=3 refs opened")], "allow"),
+        ("shell use that opens nothing", [CMD, agent("scout"), tool("Bash", command="dotnet --version"),
+                                          say("Steps: scout=dispatched verified=1 refs opened")], "block"),
+    ]
     failed = 0
-    for name, entries, want in cases:
-        got = run(entries, cwd)
+    for name, entries, want, *last in [(*c, None) if len(c) == 3 else c for c in cases] + [
+        ("Steps line only in last_assistant_message", [CMD, agent("scout"), say("working on it")], "block",
+         "Report.\n\nSteps: scout=dispatched runner=dispatched"),
+        ("last_assistant_message honest", [CMD, agent("scout"), agent("runner"), say("working on it")], "allow",
+         "Report.\n\nSteps: scout=dispatched runner=dispatched"),
+    ]:
+        got = run(entries, cwd, last=last[0] if last else None)
         failed += got != want
         print(f"{'ok  ' if got == want else 'FAIL'} {want:5} {got:5} {name}")
     got = run([CMD, say("Steps: runner=dispatched")], cwd, active=True)
     failed += got != "allow"
     print(f"{'ok  ' if got == 'allow' else 'FAIL'} allow {got:5} second stop never blocks (stop_hook_active)")
-    print(f"\n{len(cases) + 1 - failed}/{len(cases) + 1} passed")
+    total = len(cases) + 3
+    print(f"\n{total - failed}/{total} passed")
     sys.exit(1 if failed else 0)
 
 

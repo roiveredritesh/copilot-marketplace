@@ -603,3 +603,38 @@ Still open, by design or low value (all four resolved in §17):
 | `dotnet:guide` `paths:` | Measured: a `paths:` skill adds 0 tokens at session start, but on 2.1.302 it never entered the skill listing, even after `.cs` files were read (comma-string and YAML-list forms, 2 Sonnet + 2 Haiku runs). Removed as dead config. `implement` and `review` already read the guide's references directly. | — |
 
 Found while doing this: the fake `psql` had no answers for the verification queries `schema-fix.md` prescribes (columns, sizes, index definitions, time zone, date ranges). Sonnet then inspected the stub and in one run refused to reach the gate, which made the pg gate case flaky. It now answers each statement in a `-c` in `psql -A -F'|'` shape, with the label column the skill's queries use, and returns no rows (not a "no canned answer" message) for anything else. Pg gate 4/4 with no run mentioning a stub; `schema-fix-writes-safe-scripts` 2/2; `fakebin_test` 29/29. A `controller` regex in `scout-runs-full-order` was too narrow (a correct answer cited `OrdersController.cs:8-10`); it now accepts lines 8-12 or a range ending there, 4/4.
+
+## 18. Real-repo test: eShopOnWeb with planted bugs (2026-10-18)
+
+Setup (`evals/realrepo/`): eShopOnWeb at `4da8212` (.NET 8, 10 projects, 254 `.cs` files) with four bugs on `feature/checkout-tweaks`: B1 `AddQuantity`→`SetQuantity`, B2 removed null guard, B3 SQL injection via `SqlQueryRaw` + interpolation, B4 `.Result` on async. Sonnet 5.5 main, the `/core:setup` settings, core + dotnet plugins, a clean environment, a fresh worktree per run. **The sandbox's network policy blocks `api.nuget.org`**, so nothing restored: build and test paths were exercised only up to the restore failure.
+
+| Run | Result | Cost (Haiku share) |
+|---|---|---|
+| `/dotnet:review main` | **4/4 planted bugs**, ranked, correct fixes; read `RESTORE FAILED` as "network, not code" | $0.080 ($0.0008) |
+| `/dotnet:debug <NRE trace>` | root cause B2 + the right commit + the fix + a regression test, plus B3 and B4 flagged | $0.150 → $0.101 after the fixes below |
+| plain bug report (B1), no slash command | right cause, line and commit from 2 inline `git` commands (Claude Code's recent-commits context gave the commit away) | $0.046 |
+| `/dotnet:build test` | forked into the Haiku runner, `RESTORE FAILED` | $0.001 |
+| `/dotnet:implement --no-tdd` fix B3 | correct `SqlQuery` fix; step gate blocked and honestly reported, nothing claimed green | $0.061 |
+| `/dotnet:audit` | `AUDIT INCOMPLETE` reported as not checked; .NET 8 end of support (2026-11-10) flagged; secret locations only | $0.051 |
+| `/dotnet:plan` 10-unit cap | grounded plan; found B1 as a prerequisite | $0.115 ($0.005) |
+| Haiku main session, whole-repo overview | 4 parallel scouts, no compaction, max prompt 40K; 38/43 citations exact (the rest were parser artifacts or ambiguous) | $0.040 |
+| repo-wide "every place quantity is read or changed" | ~20 correct locations; scout dispatched 4/4 after G8 (0/1 before), cost $0.082–0.120 vs $0.092 inline | — |
+
+Gaps found while running, and fixed:
+| # | Gap | Fix |
+|---|---|---|
+| G1 | A NuGet restore failure was reported as `BUILD FAILED`, inviting code "fixes" | Restore is its own step: `RESTORE FAILED (package source unreachable: <url>) - a network or feed problem, not a code error` |
+| G2 | An unreachable feed took **4m44s** to fail (NuGet retries) | One retry (`NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT=2` unless set): 1m06s |
+| G3 | The Steps check counted only `Read` calls for `verified=`, so verification through `sed`/`grep`/`git show` was falsely blocked, and **the final message became the hook correction instead of the RCA** | Shell reads (sed/cat/head/tail/grep/git show…) and Grep content count |
+| G4 | **Scout citations off by one**: `Read` with `offset: 0` numbers lines from 0 | PreToolUse rewrites `offset: 0` to `1` via `updatedInput` (no permission decision), for every model |
+| G5 | The Steps check missed false claims when the final message wasn't in the transcript yet (R1: claimed `verified=3` with 0 reads, not caught) | Reads the Steps line from the Stop hook's `last_assistant_message` |
+| G6 | The runner re-ran `dotnet.sh` after `RESTORE FAILED` (network looked "transient"): a minute wasted | A script that printed a `STATUS:` line has finished; never re-run it |
+| G7 | **`dotnet.sh audit` reported `vulnerable: 0` when it couldn't restore**: a false clean security result | Collects first; `STATUS: AUDIT INCOMPLETE (not checked: …) - do not report these as clean`, per-check `NOT CHECKED (reason)`; the audit skill reports them as not checked |
+| G8 | A repo-wide lookup stayed inline because the policy said "inline for a single Grep" | Scout for results spanning more than ~3 files "even when one repo-wide Grep would find them"; inline only for 1-3 known files |
+| G10 | After delegating, the main session sometimes re-ran the scout's whole search (R6b: $0.120) | Policy: open the 1-2 decisive refs, don't re-run the executor's search ($0.089 ×2 after) |
+
+Observations, not changed:
+- `/dotnet:implement` ran its step gate with `dotnet.sh` inline rather than through `core:runner`, and wrote `runner-checks=1`. The script output is pre-condensed, so the cost is the same (§11), but the key name over-claims.
+- For one lookup on a repo this size, delegation is cost-neutral ($0.089 vs $0.092). It keeps the main context smaller (26K vs 29K), which pays off over a longer session.
+- My planted commit messages were too telling: Claude Code's recent-commit context let the plain-prompt run find B1 from the history alone. Plant with neutral messages to test code reasoning.
+- Not exercised: anything after a successful restore (TDD red/green, coverage, test-failure condensing on a real suite), `/dotnet:pr` and `/dotnet:pr-comments` on a real GitHub PR, `/dotnet:ci`, `postgresql` and `sqlserver` against a live database.

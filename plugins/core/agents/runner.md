@@ -13,7 +13,7 @@ Rules:
 1. Run the listed commands, in order, exactly as written. Don't add commands, except to read a file a step names.
 2. Never edit files, commit, push, reset, delete, or write to a database unless a step literally says so.
 3. Report only what the commands printed. Never summarize output you didn't see, and never guess a result for a command that didn't run.
-4. If a command fails, retry once only when the failure is clearly transient (network, lock). Otherwise, or after the retry, stop and return `BLOCKED: <one line>` with the key error line.
+4. If a command fails, retry once only when the failure is clearly transient (network, lock). Otherwise, or after the retry, stop and return `BLOCKED: <one line>` with the key error line. A script that printed a `STATUS:` line has finished, whatever the status (`RESTORE FAILED` included): return its output and never re-run it, because it already retries.
 5. Return exactly the `return:` format and nothing else. Default: at most 30 lines.
 6. Never paste full logs, full diffs, or full query results. Condense only: dedupe errors, keep `path:line CODE message`, keep the first assertion line per failed test, keep the top rows of a query.
 7. The core plugin's hooks enforce two limits: a command denied for the context budget, and a turn-limit note saying the next reply is your last. On either, run nothing more. Return what you have in the `return:` format, then one line `not done: <steps not run>` Only then: a complete order gets no `not done` line.

@@ -11,7 +11,9 @@ would push the prompt past 95K before compaction runs is denied with a way to ma
 range that fits, Bash a `| head`, an MCP or other tool a subagent that returns only what is needed.
 SessionStart (compact), Haiku main session: re-inject the user's request and the tool calls already made.
 
-Any error, a non-Haiku model, or CLAUDE_CORE_HAIKU_GUARD=0 means allow and print nothing."""
+PreToolUse, every model: a Read with offset 0 is rewritten to offset 1 (Read numbers from 0 otherwise).
+
+Any error, a non-Haiku model, or CLAUDE_CORE_HAIKU_GUARD=0 means allow and print nothing (except the offset fix)."""
 import json, os, re, sys
 
 BUDGET = int(os.environ.get("CLAUDE_CORE_HAIKU_BUDGET") or 60000)  # subagents: stop before compaction
@@ -141,8 +143,7 @@ def estimate(use, cwd):
 
 
 def deny(reason):
-    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
-                                             "permissionDecision": "deny", "permissionDecisionReason": reason}}))
+    return {"permissionDecision": "deny", "permissionDecisionReason": reason}
 
 
 def pre_tool_use(hook):
@@ -175,7 +176,7 @@ def pre_tool_use(hook):
             f.write(json.dumps({"agent": hook.get("agent_type", "main"), "tool": hook.get("tool_name"), "last": size,
                                 "current": current, "projected": projected, "lagging": not current_written}) + "\n")
     if sub and projected > BUDGET:
-        deny(f"Context budget: this work order has used ~{size // 1000}K tokens, and this call would bring the "
+        return deny(f"Context budget: this work order has used ~{size // 1000}K tokens, and this call would bring the "
              f"prompt to ~{projected // 1000}K (budget {BUDGET // 1000}K, below Haiku's 100K price tier and before "
              f"compaction). Make no more tool calls. Return now in the work order's return format with what you "
              f"have found, then one line `not done: <the steps or files not finished>`.")
@@ -184,9 +185,9 @@ def pre_tool_use(hook):
         turn = len({(r.get("message") or {}).get("id") for r in rows if r.get("type") == "assistant"
                     and (r.get("message") or {}).get("usage")}) + (0 if current_written else 1)
         if limit and turn >= limit - 1:
-            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext":
-                  f"Turn limit (core plugin turn counter): turn {turn} of this agent's maxTurns {limit} is done. "
-                  f"The run is cut off after turn {limit}, so the next reply is the last one that reaches the caller."}}))
+            return {"additionalContext":
+                    f"Turn limit (core plugin turn counter): turn {turn} of this agent's maxTurns {limit} is done. "
+                    f"The run is cut off after turn {limit}, so the next reply is the last one that reaches the caller."}
     elif projected > MAIN_LIMIT and size < MAIN_LIMIT - 10000 and hook.get("tool_name") != "Agent" and window_set():
         # size already past ~85K means compaction isn't running at ~80K: denying couldn't help, so allow
         tool = hook.get("tool_name") or ""
@@ -203,7 +204,7 @@ def pre_tool_use(hook):
         else:
             how = ("Make this call inside a subagent (Agent tool) that returns only the part you need, "
                    "or ask the user to run /compact first.")
-        deny(f"This call's result could bring the Haiku prompt to ~{projected // 1000}K tokens, past the 100K price "
+        return deny(f"This call's result could bring the Haiku prompt to ~{projected // 1000}K tokens, past the 100K price "
              f"tier, before compaction can run. {how}")
 
 
@@ -264,14 +265,25 @@ def after_compact(hook):
           "so don't repeat them.")
 
 
+def zero_offset_fix(hook):
+    """Read numbers lines from 0 when offset is 0, so every path:line cited from it is one too low. Any model."""
+    inp = hook.get("tool_input") or {}
+    if hook.get("tool_name") == "Read" and str(inp.get("offset", "")).strip() == "0":
+        return {"updatedInput": dict(inp, offset=1)}  # no permissionDecision: permissions are decided as usual
+    return {}
+
+
 def main():
-    if os.environ.get("CLAUDE_CORE_HAIKU_GUARD", "1") == "0":
-        return
     hook = json.load(sys.stdin)
     event = hook.get("hook_event_name")
+    guard = os.environ.get("CLAUDE_CORE_HAIKU_GUARD", "1") != "0"
     if event == "PreToolUse":
-        pre_tool_use(hook)
-    elif event == "SessionStart" and hook.get("source") == "compact":
+        out = (pre_tool_use(hook) if guard else None) or {}
+        if out.get("permissionDecision") != "deny":
+            out.update(zero_offset_fix(hook))
+        if out:
+            print(json.dumps({"hookSpecificOutput": dict({"hookEventName": "PreToolUse"}, **out)}))
+    elif guard and event == "SessionStart" and hook.get("source") == "compact":
         after_compact(hook)
 
 

@@ -93,6 +93,15 @@ def main():
             ("main: Agent is never denied", [assistant("m1", H, 84000, [("t9", "Agent", {"subagent_type": "core:scout"})])],
              pre("Agent", {"subagent_type": "core:scout"}), None, None, ""),
             ("main: past 85K, compaction not running", [assistant("m1", H, 88000, [read_big])], pre("Read", {"file_path": big}), None, None, ""),
+            # Read numbers lines from 0 when offset is 0: rewritten to 1 for every model, never auto-approved
+            ("offset 0 rewritten (any model)", [assistant("m1", S, 20000, [("t9", "Read", {"file_path": small, "offset": 0})])],
+             pre("Read", {"file_path": small, "offset": 0, "limit": 5}), None, None, '"updatedInput"'),
+            ("offset 0 rewritten with the guard off", [assistant("m1", S, 20000, [("t9", "Read", {"file_path": small, "offset": 0})])],
+             pre("Read", {"file_path": small, "offset": 0}), None, {"CLAUDE_CORE_HAIKU_GUARD": "0"}, '"offset": 1'),
+            ("offset 1 left alone", [assistant("m1", S, 20000, [("t9", "Read", {"file_path": small, "offset": 1})])],
+             pre("Read", {"file_path": small, "offset": 1}), None, None, ""),
+            ("deny wins over the offset fix", [assistant("m1", H, 61000, [("t9", "Read", {"file_path": big, "offset": 0})])],
+             pre("Read", {"file_path": big, "offset": 0}), "a1", None, "Context budget"),
             ("main: compacted since last request", [assistant("m1", H, 72000, [("t1", "Read", {"file_path": big})]),
                                                      user([{"type": "tool_result", "tool_use_id": "t1", "content": "y" * 40000}]),
                                                      {"type": "system", "subtype": "compact_boundary"}],
@@ -127,7 +136,9 @@ def main():
             ok = code == 0 and ((expect in out) if expect else out == "")
             if ok and expect and hook["hook_event_name"] == "PreToolUse":
                 decision = json.loads(out)["hookSpecificOutput"].get("permissionDecision")
-                ok = decision is None if expect == "Turn limit" else decision == "deny"
+                ok = decision is None if expect in ("Turn limit", '"updatedInput"', '"offset": 1') else decision == "deny"
+                if ok and expect == "Context budget":
+                    ok = "updatedInput" not in out
             failed += not ok
             print(("ok    " if ok else "FAIL  ") + name + ("" if ok else f"  -> {out[:200]!r}"))
     print(f"\n{n - failed}/{n} passed")
