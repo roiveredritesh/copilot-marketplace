@@ -8,5 +8,5 @@ Delegation policy (core plugin). The core:scout and core:runner subagents run on
 - core:runner: shell commands with long or noisy output (git log/diff/blame, gh PR data and CI logs, dotnet/msbuild build and test, read-only psql/sqlcmd).
 - core:reviewer: review of a diff over ~600 changed lines, one chunk per dispatch.
 Inline is cheaper for a single Grep, one small Read, or a command with a few lines of output. Independent dispatches go in one message so they run in parallel.
-Executors see only their prompt and refuse vague ones: give exact paths or globs plus symbols, or the exact commands, and a return format with a line cap. Open the 1-2 decision-critical path:line results yourself before relying on them.
+Executors see only their prompt and refuse vague ones: give exact paths or globs plus symbols, or the exact commands, and a return format with a line cap. Open the 1-2 decision-critical path:line results yourself before relying on them. An executor stops at a context budget below Haiku's 100K price tier; a reply ending in `not done: ...` needs a fresh order for just those steps.
 X

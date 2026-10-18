@@ -16,3 +16,4 @@ Rules:
 4. If a command fails, retry once only when the failure is clearly transient (network, lock). Otherwise, or after the retry, stop and return `BLOCKED: <one line>` with the key error line.
 5. Return exactly the `return:` format and nothing else. Default: at most 30 lines.
 6. Never paste full logs, full diffs, or full query results. Condense only: dedupe errors, keep `path:line CODE message`, keep the first assertion line per failed test, keep the top rows of a query.
+7. If a command is denied for the context budget, run nothing more. Return what you have in the `return:` format, then one line `not done: <steps not run>`.

@@ -546,7 +546,28 @@ Test: five 1,600-line files read in 400-line chunks (~19K tokens per read, 20 re
 
 Conclusions:
 - The per-model window applies to Haiku main sessions **and** subagents, and leaves other models alone. The alias key `haiku` works, so `/core:setup` writes `modelSettings.haiku` and it follows future Haiku releases.
-- Compaction fires at ~72-80K with a 100K window, which leaves ~20K of headroom for the compaction request itself. One tool result larger than that could still push the compaction call past 100K, so keep scout reads to ranges (rule 2) and work orders small.
+- Compaction fires at ~72-80K with a 100K window, which leaves ~20K of headroom for the compaction request itself. One tool result larger than that could still push the compaction call past 100K, so keep scout reads to ranges (rule 2) and work orders small. Resolved in §15.
 - `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides per-model windows for every model, and `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` also applies to every model, so neither works as a Haiku-only setting.
-- As in §12, a compacted Haiku can lose its place in a long mechanical task (the main arm stopped after 13 of 20 reads). The answer is still small work orders, not a larger window.
+- As in §12, a compacted Haiku can lose its place in a long mechanical task (the main arm stopped after 13 of 20 reads). The answer is still small work orders, not a larger window. Resolved in §15.
 - Plugins can't set `modelSettings`: plugin `settings.json` takes only `agent` and `subagentStatusLine`. So the setting goes in user settings via `/core:setup`, and a SessionStart check (`hooks/haiku_window.py`) prints a one-line note only when it's missing, above 100K, or overridden by `CLAUDE_CODE_AUTO_COMPACT_WINDOW`.
+
+## 15. Haiku context guard: no compaction overflow, no lost place (2026-10-18)
+
+§14 left two gaps. (1) Compaction fires at ~80K, and the compaction request carries the whole context plus the latest tool result, so a result over ~20K could push that request past 100K. (2) A compacted Haiku can lose its place: the §14 main arm stopped after 13 of 20 reads.
+
+`hooks/haiku_guard.py` (PreToolUse on every tool, and SessionStart `compact`) acts only when the transcript's latest request ran on Haiku:
+- **Projection.** The last recorded request size, plus the tool results written since, plus this call's estimate. A Read is estimated from the requested lines at 1.9 chars/token (measured on Haiku 5.5: shell 1.9, Markdown 2.4, Python 2.6, with Read's line prefixes), capped at 25K because Read refuses larger results; Bash is 10K, Grep 4K. Subagent transcripts are at `<session>/subagents/agent-<agent_id>.jsonl`; PreToolUse input carries `agent_id` and `agent_type` inside a subagent (verified).
+- **Transcripts lag the hook.** In every live call the message holding the current tool_use wasn't on disk yet, main and subagent alike. A first version added that message's calls as if pending and denied a normal read after compaction (111K projected; the real figure was ~54K). Fixed: when the current call isn't in the transcript, count the tool results already written instead. When a compact boundary follows the last recorded request, allow, because the context was just reset.
+- **Executors (any Haiku subagent): stop at 60K** (`CLAUDE_CORE_HAIKU_BUDGET`), below the ~72K where subagents compact. The deny reason tells the agent to make no more calls and return its findings plus `not done: <steps>`. scout, runner, publisher and Explore have a matching rule, and the delegation policy tells the main session to send a fresh order for just those steps. An executor never compacts, so it can't lose its place, and no executor request reaches 100K.
+- **Main Haiku session: a Read past 95K is denied** with a line count that fits, so compaction runs on a request under 100K.
+- **Resume point.** After a compaction in a Haiku session, SessionStart re-injects the user's last request verbatim (up to 1,500 chars) and the tool calls made since (up to 40, one line each).
+
+Live runs (same 20-read fixture as §14, `modelSettings.haiku.autoCompactWindow: 100000`, `CLAUDE_CORE_HAIKU_GUARD_LOG` for the projections):
+
+| Arm | Result | Requests > 100K | Largest prompt | Compactions | Cost |
+|---|---|---|---|---|---|
+| Haiku main, window only (§14) | stopped after 13/20 reads | 0 | 71K | 4 | $0.072 |
+| Haiku main, window + guard + resume point | **all 20/20 reads**, all 5 MARKERs | 0 | 72K | 6 at ~80.8K | $0.110 |
+| scout, window + guard | denied at 64K projected; returned `not done: data1.txt offset 801 onward, data2-5` | 0 | 43K | **none** | $0.007 |
+
+The projections before each main-session compaction were ~92K, about what the compaction request really carries with ~20K reads. So the gap was real, and the 95K cap closes it with ~5K left for the summary prompt. Core evals afterwards: delegates-without-being-named 1/1, scout-blocks-vague-order 1/1, scout-runs-full-order 2/3 (one run's LLM judge failed the answer; the 2 re-runs passed).

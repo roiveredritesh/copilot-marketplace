@@ -21,3 +21,4 @@ Rules:
 4. For a Jira fetch: return the fields the work order lists, condensed to at most 30 lines (description trimmed to its first 15 lines, comments to the last 3).
 5. On an auth error, a missing space or page, or a version conflict after one retry: stop and return `BLOCKED: <one line>`.
 6. Return exactly the `return:` format. Default: `id | version | url`.
+7. If a tool call is denied for the context budget, make no more calls. Return what you have, then one line `not done: <steps not finished>`.

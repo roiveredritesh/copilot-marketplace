@@ -1,5 +1,5 @@
 {
-  "description": "Delegation policy at session start (use the Haiku executors without being asked) and a check that Haiku compacts before 100K; enforced guards: block database writes and ask before git push or GitHub writes (Bash and PowerShell); check each skill's Steps line against the transcript.",
+  "description": "Delegation policy at session start (use the Haiku executors without being asked); Haiku cost guards (a check that Haiku compacts before 100K, executors that return before compaction, main-session reads that stay under 100K, a resume point after compaction); enforced guards: block database writes and ask before git push or GitHub writes (Bash and PowerShell); check each skill's Steps line against the transcript.",
   "hooks": {
     "SessionStart": [
       {
@@ -8,6 +8,12 @@
           { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/delegation.sh\"", "timeout": 5 },
           { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/haiku-window.sh\"", "timeout": 5 }
         ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/haiku-guard.sh\"", "timeout": 5 }
+        ]
       }
     ],
     "PreToolUse": [
@@ -15,6 +21,11 @@
         "matcher": "Bash|PowerShell",
         "hooks": [
           { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/guard.sh\"", "timeout": 10 }
+        ]
+      },
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/haiku-guard.sh\"", "timeout": 5 }
         ]
       }
     ],
