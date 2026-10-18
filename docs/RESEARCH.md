@@ -380,7 +380,7 @@ Implementation note: P1–P3 are file-heavy but independent per plugin. They can
 | D7 | Global settings via setup | approved: `CLAUDE_CODE_SUBAGENT_MODEL=haiku`, Explore → Haiku override, Haiku `autoCompactWindow` |
 | D8 | Reports | **chat only**. `--save` writes a file outside the repo (or a gitignored folder) |
 | D9 | Benchmark | public sample repos (one .NET Core, one .NET Framework/WebForms) |
-| D10 | Haiku 100K compaction | ~~`modelSettings` autoCompactWindow~~ dropped: no effect, and the default already compacts Haiku below 100K (§12). Design limits in §4.7 stay |
+| D10 | Haiku 100K compaction | **`modelSettings.haiku.autoCompactWindow: 100000`**, applied by `/core:setup` (§14). It was dropped once on 2.1.295 (§12), but on 2.1.302 the default lets Haiku run to ~967K. Design limits in §4.7 stay |
 | D11 | MCP isolation | **full isolation**: user-level `publisher` with inline Atlassian (+ GitHub fallback). The servers are removed from the main config |
 | D12 | Atlassian MCP | official Atlassian remote server |
 | D13 | SQL Server / legacy scope | **SQL Server dropped** (LINQ-to-SQL, MSSQL query/schema tools, Telerik dropped too). `dotnet-legacy` keeps only **WebForms modernization** + **.NET Framework → .NET migration** |
@@ -486,7 +486,7 @@ Plus the fixed per-request overhead (§10): +4,510 → +381 tokens. That saving 
 - A vague runner order ("check the logs") returned `BLOCKED: work order missing steps`.
 - A scoped scout order returned 10 `path:line` citations, **10/10 verified exact** against the files.
 
-### Haiku compaction check (D10, 2026-10-09, Claude Code 2.1.295)
+### Haiku compaction check (D10, 2026-10-09, Claude Code 2.1.295; superseded by §14)
 Five 1,600-line files were read in 800-line chunks, about 25K tokens per read. Each arm also ran without the desktop app's inherited `CLAUDE_CODE_AUTO_COMPACT_WINDOW`.
 
 | Run | Setting | Compactions at preTokens | Largest Haiku request |
@@ -528,3 +528,25 @@ Eval `core/evals/delegates-without-being-named` (Sonnet main, plain request to m
 | descriptions + SessionStart policy | **3/3** | 0.066 |
 
 The hook is what moves it. On this 5-file fixture delegating costs more than doing it inline, because the spawn and the verification reads cost more than three greps. The saving shows on real repos, where inline search pulls whole files into the main context and every later turn re-reads them. Fixed overhead measured with `claude -p "Reply with OK."`: +418 input tokens per request with the hook (36,046 → 36,464), plus ~50 for the longer descriptions.
+
+## 14. Haiku-only compaction under 100K (2026-10-18, Claude Code 2.1.302)
+
+Haiku 5.5 bills $0.10/$0.50 per MTok for prompts up to 100K tokens and $0.50/$2.50 above (5x). It runs with a 1M window, and the current docs say Haiku sessions auto-compact at about 967K by default. So §12's conclusion ("the default already compacts Haiku below 100K") no longer holds. Two likely reasons it looked different then: §12's test window of 60000 is below the setting's 100000 minimum, so it was ignored; and the default compaction point has since moved.
+
+Test: five 1,600-line files read in 400-line chunks (~19K tokens per read, 20 reads). Every run used a clean environment (`env -i`, so nothing inherited such as `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`), with settings passed through `--settings`. Prompt size = input + cache read + cache write per request, taken from the transcript.
+
+| Arm | Setting | Requests > 100K | Largest prompt | Compactions at | Cost |
+|---|---|---|---|---|---|
+| Haiku main | default | 16/21 | 393K | none | $0.517 |
+| Haiku main | `modelSettings.claude-haiku-5-5.autoCompactWindow: 100000` | 0/14 | 71K | 80.4K, 79.8K, 80.2K, 80.1K | $0.072 |
+| scout subagent (Haiku) | default | 7/12 | 195K | none | — |
+| scout subagent (Haiku) | `modelSettings.claude-haiku-5-5…: 100000` | 0/12 | 64K | 71.4K, 73.2K, 73.6K | $0.044 |
+| scout subagent (Haiku) | `modelSettings.haiku…: 100000` (alias key) | 0/11 | 65K | 71.3K, 73.3K, 73.9K | — |
+| Sonnet 5.5 main | `modelSettings.haiku…: 100000` | 4/9 | 165K | none (unaffected) | $0.707 |
+
+Conclusions:
+- The per-model window applies to Haiku main sessions **and** subagents, and leaves other models alone. The alias key `haiku` works, so `/core:setup` writes `modelSettings.haiku` and it follows future Haiku releases.
+- Compaction fires at ~72-80K with a 100K window, which leaves ~20K of headroom for the compaction request itself. One tool result larger than that could still push the compaction call past 100K, so keep scout reads to ranges (rule 2) and work orders small.
+- `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides per-model windows for every model, and `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` also applies to every model, so neither works as a Haiku-only setting.
+- As in §12, a compacted Haiku can lose its place in a long mechanical task (the main arm stopped after 13 of 20 reads). The answer is still small work orders, not a larger window.
+- Plugins can't set `modelSettings`: plugin `settings.json` takes only `agent` and `subagentStatusLine`. So the setting goes in user settings via `/core:setup`, and a SessionStart check (`hooks/haiku_window.py`) prints a one-line note only when it's missing, above 100K, or overridden by `CLAUDE_CODE_AUTO_COMPACT_WINDOW`.
