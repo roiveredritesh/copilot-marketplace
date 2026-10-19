@@ -12,6 +12,7 @@ Cost-optimized Claude Code plugins for .NET (Core **and** Framework) and Postgre
 ```
 `/core:setup` runs once. It shows every change and asks before applying it:
 - subagents default to Haiku
+- Haiku compacts before 100K tokens (Haiku 5.5 bills prompts over 100K at 5x); other models keep their own windows
 - the built-in Explore agent runs on Haiku
 - an isolated `publisher` agent owns the Confluence/Jira/GitHub MCP servers, so their tools stay out of the main session
 
@@ -59,22 +60,25 @@ To try the plugins from a local checkout before they reach `main`: `/plugin mark
 
 ## Plugins in detail
 
-Each command below names who does the work. **Main** = your session model, which judges and writes code. **Haiku** = the `scout`/`runner` executors, which search, run commands, and condense output. **Every skill loads only when you invoke it** (`disable-model-invocation`): none of them sits in the default context. With all plugins enabled, the default overhead is about 325 tokens, which is the scout/runner/reviewer agent descriptions the skills dispatch to.
+Each command below names who does the work. **Main** = your session model, which judges and writes code. **Haiku** = the `scout`/`runner` executors, which search, run commands, and condense output. **Every skill loads only when you invoke it** (`disable-model-invocation`): none of them sits in the default context. With all plugins enabled, the default overhead is about 800 tokens: the scout/runner/reviewer agent descriptions (~375) plus the delegation policy (~420) that lets Claude use them without being asked.
 
 ### `core`: required everywhere
 The shared executors that every other plugin dispatches to, plus the one-time setup.
 
 | Piece | What it does | Use it when |
 |---|---|---|
-| `/core:setup` | Sets subagents and Explore to Haiku. Moves Confluence/Jira/GitHub MCP servers into an isolated `publisher` agent. Asks before each change. | Once, right after install. |
+| `/core:setup` | Sets subagents and Explore to Haiku, and a Haiku-only auto-compact window of 100K. Moves Confluence/Jira/GitHub MCP servers into an isolated `publisher` agent. Asks before each change. | Once, right after install. |
 | `scout` agent (Haiku) | Read-only code and web search. It takes an exact work order and returns facts with `path:line` or URL. A vague order returns `BLOCKED: work order missing <field>`. | Skills use it to map code, find callers, and research libraries. You can also dispatch it: *"use core:scout: scope src/Orders/\*\*, terms OrderService, IOrderRepository; list callers with path:line"*. |
 | `runner` agent (Haiku) | Runs exact shell commands: git, gh, dotnet/msbuild, read-only psql. Returns condensed output only. | Builds, tests, git history, CI logs, DB queries. |
 | `reviewer` agent (Sonnet) | Reviews one chunk of a very large diff. | Only `/dotnet:review` uses it, when a diff is too big for one session. |
+| Delegation policy (always on) | At session start (and after `/clear` or compaction) a ~400-token note tells Claude to hand multi-file code/web lookups to `scout`, noisy shell output to `runner`, and very large diffs to `reviewer`, **without you naming them**, and to stay inline for a single grep or a short command. `CLAUDE_CORE_DELEGATION=0` turns it off. | Nothing to do. Without it, plain requests (no slash command) were answered inline on the main model: 0/3 vs 3/3 dispatches in the `delegates-without-being-named` eval. |
+| Haiku window check (always on) | At session start, if the Haiku auto-compact window is missing or above 100K in the effective settings (user, project, local, the session's `--settings`, managed settings files, cached server-managed settings) (or `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides it), Claude gets a one-line note to point you to `/core:setup`. Silent when it's set. It also flags an `Explore`/`publisher` in `~/.claude/agents/` left by an older `/core:setup`. `CLAUDE_CORE_HAIKU_CHECK=0` turns it off. | Nothing to do. |
+| Haiku context guard (always on) | Before each tool call in a Haiku context it projects the next prompt size: the last request plus this call's estimated result. **Executors** (scout, runner, publisher, Explore) stop at 60K, below compaction: the call is denied and they return what they found plus `not done: <steps>`, so they never compact, never lose their place, and never cross 100K. Claude then sends a fresh order for just those steps. The same happens at an agent's `maxTurns`: on the next-to-last turn it is told its next reply is the last, so hitting the limit still returns results. **A main Haiku session** still compacts (once `/core:setup` has set the 100K window), but a call that would push the prompt past 95K before compaction is denied with a way to shrink it: a smaller line range for Read, `| head -n 100` for Bash, a subagent for MCP and other tools (Agent itself is never denied). After a compaction it re-injects your request and the tool calls already made, so Haiku continues where it was. `CLAUDE_CORE_HAIKU_BUDGET` sets the executor budget; `CLAUDE_CORE_HAIKU_GUARD=0` turns the guard off. | Nothing to do. Needs Python 3.8+, otherwise it is skipped. |
 | Guard hook (always on) | Before every Bash or PowerShell command: denies database writes (psql without read-only, sqlcmd/Invoke-Sqlcmd outside the audit or a rolled-back transaction, `dotnet ef database update/drop`, `dropdb`, `pg_restore`), and asks you before `git push` or any GitHub write, even when your settings allow it. `CLAUDE_ALLOW_DB_WRITES=1` turns the DB part off. It reads the command text, so a write hidden in a script file gets past it: keep DB permissions tight too. | Nothing to do. It costs no tokens. |
 | Steps check (always on) | When a skill ends, compares its `Steps:` line with what really happened: a claimed scout or runner dispatch needs a real Agent call, `gate=asked` a real question, `file=` an existing file, `TESTS PASSED` a real test result. A false claim sends Claude back once to do the step or correct the line. Needs Python 3.8+, otherwise it is skipped. | Nothing to do. |
 
 ### `dotnet`: every .NET repo (Core and Framework)
-The full SDLC loop. Builds and tests go through `scripts/dotnet.sh`. It detects SDK-style vs legacy projects, finds MSBuild through vswhere, restores `packages.config`, and prints only errors and failed tests.
+The full SDLC loop. Builds and tests go through `scripts/dotnet.sh`. It detects SDK-style vs legacy projects, finds MSBuild through vswhere, restores `packages.config`, and prints only errors and failed tests. A restore that can't reach the package feed reports `RESTORE FAILED (package source unreachable: <url>)` within about a minute instead of a misleading `BUILD FAILED` after several, and `/dotnet:audit` reports `AUDIT INCOMPLETE` rather than a clean result for checks it couldn't run.
 
 | Command | Use case | Example |
 |---|---|---|
@@ -159,11 +163,12 @@ Pass a page URL or id instead of a space to update an existing page.
 
 ## How cost is controlled
 1. **Model tiering.** Your main session (Sonnet 5.5 recommended) judges. Haiku executors do I/O at about 1/40 of the Opus 5.5 token price. Nothing pins Opus.
-2. **Small fixed overhead.** Every skill is user-invoked only (`disable-model-invocation`), so none of them costs anything until you call it. All plugins together add about 325 tokens per request. Guidance loads one reference file at a time.
-3. **Bounded returns.** Executors return 30–40 lines max. Build and test output is condensed by `dotnet.sh` before any model sees it.
-4. **Cache-friendly.** Static agent and skill bodies, no inline model switches, MCP servers isolated in a subagent.
-5. **Reports go to chat.** Files (`--save`, analysis, flow specs) go to `.reports/` at the repo root. The skills add it to the repo's local git exclude, so nothing is committed by accident.
-6. **GitHub: `gh` first, MCP as fallback.** `gh` adds no tool schemas, and `--json`/`--jq` keep the output small. The GitHub MCP is used only when `gh` can't be (PR creation or metadata), and only inside the isolated `publisher`. `/core:setup` offers to remove it from the main session.
+2. **Small fixed overhead.** Every skill is user-invoked only (`disable-model-invocation`), so none of them costs anything until you call it. All plugins together add about 800 tokens per request, ~420 of them the delegation policy (`CLAUDE_CORE_DELEGATION=0` removes it). Guidance loads one reference file at a time.
+3. **Haiku stays in its cheap tier.** Haiku 5.5 costs $0.10/$0.50 per MTok up to a 100K-token prompt and $0.50/$2.50 above it. `/core:setup` sets `modelSettings.haiku.autoCompactWindow: 100000`, so Haiku sessions and subagents compact at ~72-80K. The context guard keeps every request under 100K, including the compaction request itself. In a 20-read test the Haiku session finished all 20 reads for $0.11 instead of $0.52, with no request over 100K; a scout given the same job returned `not done:` at 60K for $0.007.
+4. **Bounded returns.** Executors return 30–40 lines max. Build and test output is condensed by `dotnet.sh` before any model sees it.
+5. **Cache-friendly.** Static agent and skill bodies, no inline model switches, MCP servers isolated in a subagent.
+6. **Reports go to chat.** Files (`--save`, analysis, flow specs) go to `.reports/` at the repo root. The skills add it to the repo's local git exclude, so nothing is committed by accident.
+7. **GitHub: `gh` first, MCP as fallback.** `gh` adds no tool schemas, and `--json`/`--jq` keep the output small. The GitHub MCP is used only when `gh` can't be (PR creation or metadata), and only inside the isolated `publisher`. `/core:setup` offers to remove it from the main session.
 
 Check the overhead in any session with `/context`.
 
@@ -181,7 +186,7 @@ Eight SDLC tasks, run on eShopOnWeb (.NET 8) and eShopLegacyWebForms (.NET Frame
 The fixed overhead per request is **+381 tokens instead of +4,510**, and you pay it on every turn of every session. New is slower in wall time because it runs tests during review, sources its research, and works TDD. Details: [docs/RESEARCH.md §12](docs/RESEARCH.md).
 
 ## Requirements
-- A recent Claude Code (tested on 2.1.295). Its default compaction already keeps Haiku requests under 100K tokens.
+- A recent Claude Code (tested on 2.1.302). By default it lets Haiku 5.5 grow to ~967K before compacting, so run `/core:setup` to set the Haiku-only 100K window.
 - `bash` (Git Bash on Windows), plus the .NET SDK and/or Visual Studio Build Tools for legacy projects.
 - Optional: `psql` (PostgreSQL; found under `C:/Program Files/PostgreSQL/*/bin` when it isn't on PATH), `sqlcmd` (SQL Server), `gh` (GitHub PRs), the Atlassian remote MCP (docs-kit).
 
@@ -189,7 +194,9 @@ The fixed overhead per request is **+381 tokens instead of +4,510**, and you pay
 `scripts/validate.sh` runs `claude plugin validate --strict` on the marketplace and every plugin.
 
 Tests:
-- Free, no model calls: `python evals/guard_test.py`, `python evals/steps_check_test.py`, `python evals/frontmatter_test.py`.
-- Behavior evals (cost model calls, 3 runs per case): `claude plugin eval plugins/core --scaffold --ablation none` and `claude plugin eval plugins --eval-dir dotnet/evals --scaffold --ablation none --allow-tools Write` (run against `plugins/` so a case can also load `core`). Add `--runs 1` for a quick check. They need a logged-in `claude` CLI (`claude auth login`).
+- Graders are deterministic (regex, tool_used, file_exists) wherever a fixture fixes the facts. The one LLM-judged grader left, brainstorm's "options differ in kind", runs with `--judge-model sonnet`, because a Haiku judge splits its votes on correct answers.
+- Real repo: `bash evals/realrepo/setup.sh <dir>` clones eShopOnWeb and plants four bugs on `feature/checkout-tweaks` (ground truth in the script header). Then `bash evals/realrepo/run.sh <dir> <name> feature/checkout-tweaks "/dotnet:review main"` runs one prompt the way a user would after `/core:setup` and prints cost by model, every subagent dispatch, hook denials, and the answer. Builds and tests need the NuGet feed reachable.
+- Free, no model calls: `python evals/guard_test.py`, `python evals/steps_check_test.py`, `python evals/frontmatter_test.py`, `python evals/delegation_test.py`, `python evals/haiku_window_test.py`, `python evals/haiku_guard_test.py`, `bash evals/dotnet_sh_test.sh`.
+- Behavior evals (cost model calls, 3 runs per case): `claude plugin eval plugins/core --scaffold --ablation none` and `claude plugin eval plugins --eval-dir dotnet/evals --scaffold --ablation none --allow-tools Write --judge-model sonnet` (run against `plugins/` so a case can also load `core`). Add `--runs 1` for a quick check. They need a logged-in `claude` CLI (`claude auth login`).
 - Cases that need Bash (pr-comments, schema-fix) run in WSL or Linux, where the eval sandbox works. They use fake `gh`, `psql` and `sqlcmd` (from `evals/fakebin/`, copied into each case's workspace; the relative PATH entry finds them) that answer from fixtures, log every call, and flag GitHub writes, missing read-only and DDL, so no real PR or database is touched. Once per WSL install: `sudo apt-get install -y bubblewrap socat`, the native Linux `claude` (`curl -fsSL https://claude.ai/install.sh | bash`), and `claude auth login`. Then, from the repo:
   `PATH=".git/eval-fake/bin:$PATH" claude plugin eval plugins --eval-dir postgresql/evals --scaffold --ablation none --allow-tools Write Edit Bash --runs 1` (same with `sqlserver/evals`, and `dotnet/evals --tag wsl`). `bash evals/fakebin_test.sh` checks the fixtures and fakes for free. The design and the decisions behind it are in [docs/RESEARCH.md](docs/RESEARCH.md).

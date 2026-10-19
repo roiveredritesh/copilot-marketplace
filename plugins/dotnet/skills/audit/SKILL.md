@@ -11,6 +11,8 @@ disable-model-invocation: true
 The script prints secret *locations* only (`path:line`), never values. Never open those lines in chat. Tell the user where to look.
 
 ## 2. Prioritize (main session)
+If the status is `AUDIT INCOMPLETE`, the report starts with the unchecked areas as **not checked** with the reason (for example, the package source is unreachable). Never report them as clean or as "none found".
+
 | Finding | Priority | Action |
 |---|---|---|
 | vulnerable (High/Critical), direct dependency | now | upgrade to the first patched version; check release notes for breaking changes |

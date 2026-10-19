@@ -11,6 +11,8 @@ ASK_KEYS = ("gate", "choice", "confirm", "questions", "tests")
 FILE_KEYS = ("file", "files", "saved")
 STATUS_KEYS = ("final", "suite", "run")
 STATUSES = ("TESTS PASSED", "BUILD OK")
+# Opening a reference with Bash counts as a read too: models verify with sed/grep/git show as often as with Read.
+OPENS = re.compile(r"\b(sed|cat|head|tail|grep|rg|awk|nl|less|Get-Content|Select-String)\b|\bgit\s+(show|diff|blame|log\s+-L)\b")
 
 
 def load(path):
@@ -67,7 +69,8 @@ def check(claims, entries, cwd):
                     agents.add(str(inp.get("subagent_type", "")).split(":")[-1])
                 elif name == "AskUserQuestion":
                     asked = True
-                elif name == "Read":
+                elif name == "Read" or (name == "Grep" and inp.get("output_mode") == "content") or \
+                        (name in ("Bash", "PowerShell") and OPENS.search(str(inp.get("command", "")))):
                     reads += 1
             elif b.get("type") == "tool_result":
                 c = b.get("content")
@@ -94,7 +97,7 @@ def check(claims, entries, cwd):
         elif key == "verified":
             n = re.match(r"(\d+)", v)
             if n and reads < int(n.group(1)):
-                bad.append(f"verified={n.group(1)} refs, but only {reads} Read calls happened")
+                bad.append(f"verified={n.group(1)} refs, but only {reads} file reads happened (Read, Grep content, or sed/cat/grep/git show in a shell)")
         elif key in STATUS_KEYS:
             for s in STATUSES:
                 if s in v and s not in seen:
@@ -108,7 +111,13 @@ def main():
         if hook.get("stop_hook_active"):
             return  # already nudged once; never loop
         entries = scope(load(hook["transcript_path"]))
-        line = steps_line(entries)
+        # The hook can run before the final message reaches the transcript: prefer the text Claude Code hands over.
+        # When it does, that text is the final message: never fall back to an older Steps line in a lagging transcript.
+        if "last_assistant_message" in hook:
+            m = re.search(r"Steps:\s*(.+)", hook.get("last_assistant_message") or "")
+            line = m.group(1).strip().strip("`").strip() if m else None
+        else:  # older Claude Code without the field
+            line = steps_line(entries)
         if not line:
             return
         bad = check(parse(line), entries, hook.get("cwd") or os.getcwd())

@@ -1,7 +1,6 @@
 ---
 name: guide
 description: .NET performance and correctness guidance - EF Core queries and migrations, ASP.NET Core (DI, middleware, HttpClient), async and C# performance. Load the one reference that matches the task.
-paths: "**/*.cs, **/*.csproj, **/appsettings*.json"
 disable-model-invocation: true
 ---
 # .NET guide

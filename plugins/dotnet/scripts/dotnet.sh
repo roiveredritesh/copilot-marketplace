@@ -38,6 +38,29 @@ vs_path() {
 # Keep error/failure lines, strip "[project]" suffixes and repo-absolute prefixes, dedupe, cap.
 condense() { root=$(pwd -W 2>/dev/null || pwd); tr '\\' '/' | sed -E 's/ \[[^]]*\]$//' | sed "s#$root/##Ig" | grep -E "$1" | awk '!seen[$0]++' | head -n "$max"; }
 
+# A failed restore is a feed or network problem, not a code error: say so and stop.
+restore_failed() {
+  if echo "$1" | grep -qE "$NET_ERR"; then
+    src=$(echo "$1" | grep -oE 'for source [^ ]+' | head -1 | cut -d' ' -f3 | sed 's/\.$//')
+    echo "STATUS: RESTORE FAILED (package source unreachable${src:+: $src}) - a network or feed problem, not a code error"
+  else
+    echo "STATUS: RESTORE FAILED ($(echo "$1" | grep -cE ': error ') error lines)"
+  fi
+  echo "$1" | condense ': error |error NU'; exit 0
+}
+# Restore without NuGet's retries first, so a feed that is plainly unreachable fails in seconds, not minutes.
+# Only a definitive answer (401/403/407, DNS, refused) stops there; a failure that may be transient runs the
+# restore again with NuGet's normal retries, exactly as a plain `dotnet build` would. A user's own setting wins.
+NET_ERR='NU1301|Unable to load the service index|proxy tunnel|Name or service not known|No such host|actively refused|Connection refused'
+DEFINITIVE="status code '40[137]'|status code does not indicate success: 40[137]|Name or service not known|No such host|nodename nor servname|actively refused|Connection refused"
+try_restore() {  # sets $rout; returns the restore's status
+  rout=$(NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT="${NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT:-1}" "$@" 2>&1) && return 0
+  if echo "$rout" | grep -qE "$NET_ERR" && ! echo "$rout" | grep -qE "$DEFINITIVE"; then
+    rout=$("$@" 2>&1) && return 0
+  fi
+  return 1
+}
+
 case "$cmd" in
 detect)
   echo "STATUS: OK"
@@ -55,10 +78,11 @@ build|test)
     vs=$(vs_path) || { echo "STATUS: BLOCKED vswhere not found; install Visual Studio Build Tools"; exit 0; }
     msbuild="$vs/MSBuild/Current/Bin/MSBuild.exe"
     # Separate restore: "-restore" together with the build does not restore packages.config projects.
-    out=$("$msbuild" "$target" -t:restore -p:RestorePackagesConfig=true -nologo -v:q -clp:ErrorsOnly 2>&1) &&
+    try_restore "$msbuild" "$target" -t:restore -p:RestorePackagesConfig=true -nologo -v:q -clp:ErrorsOnly || restore_failed "$rout"
     out=$("$msbuild" "$target" -m -nologo -v:q -clp:ErrorsOnly 2>&1); rc=$?
   else
-    out=$(dotnet build "$target" -nologo -v q -clp:'ErrorsOnly;NoSummary' 2>&1); rc=$?
+    try_restore dotnet restore "$target" -nologo -v q || restore_failed "$rout"
+    out=$(dotnet build "$target" --no-restore -nologo -v q -clp:'ErrorsOnly;NoSummary' 2>&1); rc=$?
   fi
   if [ $rc -ne 0 ]; then
     echo "STATUS: BUILD FAILED ($(echo "$out" | grep -cE ': error ') error lines)"
@@ -95,23 +119,39 @@ coverage)
   rm -rf "$dir"
   ;;
 audit)
-  echo "STATUS: AUDIT"
+  # Collect first: a package check that could not run makes the whole audit INCOMPLETE, never a clean "0".
+  body=""; missing=""
   if [ -n "$legacy" ] || list '(^|/)packages\.config$' | grep -q .; then
     # NuGet audit warnings from a packages.config restore (NU1901-NU1904 = low..critical).
     if [ "$windows" = yes ] && vs=$(vs_path); then
       rows=$("$vs/MSBuild/Current/Bin/MSBuild.exe" "$target" -t:restore -p:RestorePackagesConfig=true -nologo -v:m 2>&1 | grep -oE "warning NU190[1-4]: Package '[^']+' [^ ]+ has a known [a-z]+ severity" | sed -E "s/warning (NU190.): Package '([^']+)' ([^ ]+) has a known ([a-z]+) severity/\4 \2 \3 (\1)/" | awk '!seen[$0]++')
-      echo "vulnerable (packages.config): $(echo "$rows" | grep -c .)"; echo "$rows" | grep . | head -n 20 | sed 's/^/  /'
+      body+="vulnerable (packages.config): $(echo "$rows" | grep -c .)"$'\n'"$(echo "$rows" | grep . | head -n 20 | sed 's/^/  /')"$'\n'
+    else
+      body+="vulnerable (packages.config): NOT CHECKED (needs Windows + Visual Studio Build Tools)"$'\n'; missing+=" packages.config"
     fi
-    echo "note: deprecated/outdated checks need PackageReference ('dotnet list package' skips packages.config)"
+    body+="note: deprecated/outdated checks need PackageReference ('dotnet list package' skips packages.config)"$'\n'
   fi
   if [ "$(echo "$legacy" | grep -c .)" -lt "$(echo "$projects" | grep -c .)" ]; then
-    dotnet restore "$target" -v q >/dev/null 2>&1
-    for kind in vulnerable deprecated outdated; do
-      extra=; [ $kind = vulnerable ] && extra=--include-transitive
-      rows=$(dotnet list "$target" package --$kind $extra 2>&1 | grep -E '^\s+> ' | sed -E 's/^\s+> //; s/\s+/ /g' | awk '!seen[$0]++')
-      echo "$kind: $(echo "$rows" | grep -c .)"; echo "$rows" | grep . | head -n 20 | sed 's/^/  /'
-    done
+    if try_restore dotnet restore "$target" -nologo -v q; then
+      for kind in vulnerable deprecated outdated; do
+        extra=; [ $kind = vulnerable ] && extra=--include-transitive
+        lout=$(dotnet list "$target" package --$kind $extra 2>&1); lrc=$?
+        err=$(echo "$lout" | grep -vE '^\s+> ' | grep -m1 -iE '(^|[^a-z])error([^a-z]|$)|Unable to load the service index')
+        if [ $lrc -ne 0 ] || [ -n "$err" ]; then
+          body+="$kind: NOT CHECKED ($(echo "${err:-exit $lrc}" | sed -E 's/^[[:space:]]+//' | cut -c1-160))"$'\n'; missing+=" $kind"
+        else
+          rows=$(echo "$lout" | grep -E '^\s+> ' | sed -E 's/^\s+> //; s/\s+/ /g' | awk '!seen[$0]++')
+          body+="$kind: $(echo "$rows" | grep -c .)"$'\n'"$(echo "$rows" | grep . | head -n 20 | sed 's/^/  /')"$'\n'
+        fi
+      done
+    else
+      why=$(echo "$rout" | grep -qE "$NET_ERR" && echo "package source unreachable" || echo "$(echo "$rout" | grep -cE ': error ') restore errors")
+      body+="vulnerable, deprecated, outdated: NOT CHECKED (restore failed: $why)"$'\n'; missing+=" vulnerable deprecated outdated"
+    fi
   fi
+  if [ -n "$missing" ]; then echo "STATUS: AUDIT INCOMPLETE (not checked:$missing) - do not report these as clean"
+  else echo "STATUS: AUDIT"; fi
+  printf '%s' "$body" | grep -v '^$'
   echo "frameworks: ${tfms:-unknown}"
   # Report locations only, never the secret values.
   pat='(Password|Pwd)=[^;"'"'"' ]{3,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|gh[pousr]_[A-Za-z0-9]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|AccountKey=[A-Za-z0-9+/=]{20,}|sk-[A-Za-z0-9_-]{20,}'

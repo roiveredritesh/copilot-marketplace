@@ -380,7 +380,7 @@ Implementation note: P1–P3 are file-heavy but independent per plugin. They can
 | D7 | Global settings via setup | approved: `CLAUDE_CODE_SUBAGENT_MODEL=haiku`, Explore → Haiku override, Haiku `autoCompactWindow` |
 | D8 | Reports | **chat only**. `--save` writes a file outside the repo (or a gitignored folder) |
 | D9 | Benchmark | public sample repos (one .NET Core, one .NET Framework/WebForms) |
-| D10 | Haiku 100K compaction | ~~`modelSettings` autoCompactWindow~~ dropped: no effect, and the default already compacts Haiku below 100K (§12). Design limits in §4.7 stay |
+| D10 | Haiku 100K compaction | **`modelSettings.haiku.autoCompactWindow: 100000`**, applied by `/core:setup` (§14). It was dropped once on 2.1.295 (§12), but on 2.1.302 the default lets Haiku run to ~967K. Design limits in §4.7 stay |
 | D11 | MCP isolation | **full isolation**: user-level `publisher` with inline Atlassian (+ GitHub fallback). The servers are removed from the main config |
 | D12 | Atlassian MCP | official Atlassian remote server |
 | D13 | SQL Server / legacy scope | **SQL Server dropped** (LINQ-to-SQL, MSSQL query/schema tools, Telerik dropped too). `dotnet-legacy` keeps only **WebForms modernization** + **.NET Framework → .NET migration** |
@@ -405,7 +405,7 @@ Where the build deviates from the plan above, and why:
 
 Skill invocation modes:
 - **`context: fork` into Haiku:** `dotnet:build`.
-- **Model-invocable (in the listing):** `dotnet:guide` (only on matching paths), `postgresql:pg`, `docs-kit:jira`.
+- **Model-invocable (in the listing):** `dotnet:guide` (only on matching paths), `postgresql:pg`, `docs-kit:jira`. *(Superseded: since 9c935fc every skill is user-invoked; `paths:` was removed from `dotnet:guide` in §17.)*
 - **User-invoked only (not in the listing):** `dotnet:review`, `dotnet:debug`, `dotnet:plan`, `dotnet-legacy:modernize`, `docs-kit:confluence`, `core:setup`.
 
 ### Verified
@@ -486,7 +486,7 @@ Plus the fixed per-request overhead (§10): +4,510 → +381 tokens. That saving 
 - A vague runner order ("check the logs") returned `BLOCKED: work order missing steps`.
 - A scoped scout order returned 10 `path:line` citations, **10/10 verified exact** against the files.
 
-### Haiku compaction check (D10, 2026-10-09, Claude Code 2.1.295)
+### Haiku compaction check (D10, 2026-10-09, Claude Code 2.1.295; superseded by §14)
 Five 1,600-line files were read in 800-line chunks, about 25K tokens per read. Each arm also ran without the desktop app's inherited `CLAUDE_CODE_AUTO_COMPACT_WINDOW`.
 
 | Run | Setting | Compactions at preTokens | Largest Haiku request |
@@ -509,3 +509,153 @@ Same tasks, a fresh clone, both arms run again the same day. The new arm uses th
 | legacy | 0.332 | **0.314** | **−5%** (was +12%) | 114 | 196 | 14 / 17 (new was 20) | both green; new TDD, 25 cases; old 33 |
 
 After the fix the main session no longer burns turns on a false `NO TESTS MATCHED`. With these implement numbers the 8-task total is **old $1.60 vs new $1.10 (−31%)**. The old arm itself varied between runs ($0.289 → $0.332 on legacy), so read single-run deltas of ±10% as noise. New stays slower in wall time because of the TDD loop.
+
+## 13. Auto-delegation without naming the agent (2026-10-18)
+
+Problem: outside a slash command, Claude never used `scout`/`runner`. The user had to write "use core:scout". Causes: every skill is `disable-model-invocation`, so nothing in a plain session said when the executors beat inline work; the agent descriptions described the input contract ("Send a WORK ORDER", "Not for open-ended exploration") rather than when to use them; and both executors blocked any order without a return format, which is how ad-hoc dispatches are usually written.
+
+Changes:
+- `core` ships a `SessionStart` hook (`hooks/delegation.sh`, matchers `startup|clear|compact`) whose stdout is a short delegation policy: scout for lookups over ~3 files or several searches, runner for noisy shell output, reviewer for diffs over ~600 lines, inline for a single grep or a short command. It also says that `core:scout` in a skill means the Agent tool with that `subagent_type`. `CLAUDE_CORE_DELEGATION=0` disables it.
+- Agent descriptions start with "Use proactively for ..." (the trigger wording the subagent docs recommend).
+- scout and runner fall back to their default line-capped return when an order has none. They still block an order with no concrete scope or no runnable command (`scout-blocks-vague-order` still passes 2/2).
+
+Eval `core/evals/delegates-without-being-named` (Sonnet main, plain request to map Quantity/PlaceAsync usages, 3 runs each, Claude Code 2.1.302):
+
+| Variant | scout dispatched | $/run |
+|---|---|---|
+| before | 0/3 | 0.042 |
+| new descriptions only (hook stubbed out) | 0/3 | 0.045 |
+| descriptions + SessionStart policy | **3/3** | 0.066 |
+
+The hook is what moves it. On this 5-file fixture delegating costs more than doing it inline, because the spawn and the verification reads cost more than three greps. The saving shows on real repos, where inline search pulls whole files into the main context and every later turn re-reads them. Fixed overhead measured with `claude -p "Reply with OK."`: +418 input tokens per request with the hook (36,046 → 36,464), plus ~50 for the longer descriptions.
+
+## 14. Haiku-only compaction under 100K (2026-10-18, Claude Code 2.1.302)
+
+Haiku 5.5 bills $0.10/$0.50 per MTok for prompts up to 100K tokens and $0.50/$2.50 above (5x). It runs with a 1M window, and the current docs say Haiku sessions auto-compact at about 967K by default. So §12's conclusion ("the default already compacts Haiku below 100K") no longer holds. Two likely reasons it looked different then: §12's test window of 60000 is below the setting's 100000 minimum, so it was ignored; and the default compaction point has since moved.
+
+Test: five 1,600-line files read in 400-line chunks (~19K tokens per read, 20 reads). Every run used a clean environment (`env -i`, so nothing inherited such as `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`), with settings passed through `--settings`. Prompt size = input + cache read + cache write per request, taken from the transcript.
+
+| Arm | Setting | Requests > 100K | Largest prompt | Compactions at | Cost |
+|---|---|---|---|---|---|
+| Haiku main | default | 16/21 | 393K | none | $0.517 |
+| Haiku main | `modelSettings.claude-haiku-5-5.autoCompactWindow: 100000` | 0/14 | 71K | 80.4K, 79.8K, 80.2K, 80.1K | $0.072 |
+| scout subagent (Haiku) | default | 7/12 | 195K | none | — |
+| scout subagent (Haiku) | `modelSettings.claude-haiku-5-5…: 100000` | 0/12 | 64K | 71.4K, 73.2K, 73.6K | $0.044 |
+| scout subagent (Haiku) | `modelSettings.haiku…: 100000` (alias key) | 0/11 | 65K | 71.3K, 73.3K, 73.9K | — |
+| Sonnet 5.5 main | `modelSettings.haiku…: 100000` | 4/9 | 165K | none (unaffected) | $0.707 |
+
+Conclusions:
+- The per-model window applies to Haiku main sessions **and** subagents, and leaves other models alone. The alias key `haiku` works, so `/core:setup` writes `modelSettings.haiku` and it follows future Haiku releases.
+- Compaction fires at ~72-80K with a 100K window, which leaves ~20K of headroom for the compaction request itself. One tool result larger than that could still push the compaction call past 100K, so keep scout reads to ranges (rule 2) and work orders small. Resolved in §15.
+- `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides per-model windows for every model, and `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` also applies to every model, so neither works as a Haiku-only setting.
+- As in §12, a compacted Haiku can lose its place in a long mechanical task (the main arm stopped after 13 of 20 reads). The answer is still small work orders, not a larger window. Resolved in §15.
+- Plugins can't set `modelSettings`: plugin `settings.json` takes only `agent` and `subagentStatusLine`. So the setting goes in user settings via `/core:setup`, and a SessionStart check (`hooks/haiku_window.py`) prints a one-line note only when it's missing, above 100K, or overridden by `CLAUDE_CODE_AUTO_COMPACT_WINDOW`.
+
+## 15. Haiku context guard: no compaction overflow, no lost place (2026-10-18)
+
+§14 left two gaps. (1) Compaction fires at ~80K, and the compaction request carries the whole context plus the latest tool result, so a result over ~20K could push that request past 100K. (2) A compacted Haiku can lose its place: the §14 main arm stopped after 13 of 20 reads.
+
+`hooks/haiku_guard.py` (PreToolUse on every tool, and SessionStart `compact`) acts only when the transcript's latest request ran on Haiku:
+- **Projection.** The last recorded request size, plus the tool results written since, plus this call's estimate. A Read is estimated from the requested lines at 1.9 chars/token (measured on Haiku 5.5: shell 1.9, Markdown 2.4, Python 2.6, with Read's line prefixes), capped at 25K because Read refuses larger results; Bash is 10K, Grep 4K. Subagent transcripts are at `<session>/subagents/agent-<agent_id>.jsonl`; PreToolUse input carries `agent_id` and `agent_type` inside a subagent (verified).
+- **Transcripts lag the hook.** In every live call the message holding the current tool_use wasn't on disk yet, main and subagent alike. A first version added that message's calls as if pending and denied a normal read after compaction (111K projected; the real figure was ~54K). Fixed: when the current call isn't in the transcript, count the tool results already written instead. When a compact boundary follows the last recorded request, allow, because the context was just reset.
+- **Executors (any Haiku subagent): stop at 60K** (`CLAUDE_CORE_HAIKU_BUDGET`), below the ~72K where subagents compact. The deny reason tells the agent to make no more calls and return its findings plus `not done: <steps>`. scout, runner, publisher and Explore have a matching rule, and the delegation policy tells the main session to send a fresh order for just those steps. An executor never compacts, so it can't lose its place, and no executor request reaches 100K.
+- **Main Haiku session: a Read past 95K is denied** with a line count that fits, so compaction runs on a request under 100K.
+- **Resume point.** After a compaction in a Haiku session, SessionStart re-injects the user's last request verbatim (up to 1,500 chars) and the tool calls made since (up to 40, one line each).
+
+Live runs (same 20-read fixture as §14, `modelSettings.haiku.autoCompactWindow: 100000`, `CLAUDE_CORE_HAIKU_GUARD_LOG` for the projections):
+
+| Arm | Result | Requests > 100K | Largest prompt | Compactions | Cost |
+|---|---|---|---|---|---|
+| Haiku main, window only (§14) | stopped after 13/20 reads | 0 | 71K | 4 | $0.072 |
+| Haiku main, window + guard + resume point | **all 20/20 reads**, all 5 MARKERs | 0 | 72K | 6 at ~80.8K | $0.110 |
+| scout, window + guard | denied at 64K projected; returned `not done: data1.txt offset 801 onward, data2-5` | 0 | 43K | **none** | $0.007 |
+
+The projections before each main-session compaction were ~92K, about what the compaction request really carries with ~20K reads. So the gap was real, and the 95K cap closes it with ~5K left for the summary prompt. Core evals afterwards: delegates-without-being-named 1/1, scout-blocks-vague-order 1/1, scout-runs-full-order 2/3 (one run's LLM judge failed the answer; the 2 re-runs passed).
+
+## 16. Remaining gaps closed (2026-10-18)
+
+| Gap | Evidence | Fix | Verified |
+|---|---|---|---|
+| An executor that hits `maxTurns` returns nothing | §14 arm C: "hit its 12-turn limit… no MARKER lines" | The guard counts the subagent's requests against `maxTurns` from its agent file. On the next-to-last turn it adds a factual note ("turn 11 of 12, the next reply is the last"); the agent's own rule says what to do. | eval `scout-answers-at-turn-limit` 4/4 + 3/3 + 2/2 (11 of 15 markers plus `not done: f12…f15`, $0.004/run) |
+| Haiku ignored that note as a prompt injection when the note held the instruction ("it came from inside the tool output… I'm ignoring it") | first version, 1/2 then 2/3 | The hook states only the fact. The instruction lives in the system prompt of scout, runner, publisher and Explore, which the agent trusts. The budget deny already worked this way. | as above |
+| Without `/core:setup`, the main-session read limit fired forever (Haiku compacts at ~967K, so every Read past 95K was denied) | code reading | The main-session rule runs only when `haiku_window.check()` finds the 100K window set | `haiku_guard_test` "window not set" |
+| An image read counted as its base64 size (~100K+), so the next call was falsely denied | code reading | Image blocks count 1,600 tokens | `haiku_guard_test` "image result" |
+| The Bash estimate (10K) was below the real cap | measured: up to ~25K chars inline (one char per token for repeated characters), larger output saved behind a 2.3K preview | 16K | — |
+| The "smaller range" line count came from a capped estimate | code reading | Uses the uncapped estimate | — |
+| ~110 ms per tool call in every session (4 MB transcript parse) | timed on a 2.4 MB transcript | A 256 KB tail first; non-Haiku sessions exit after the model check | ~45 ms per call |
+| User-level Explore/publisher from an older `/core:setup` lacked the new rules, unnoticed | code reading | The SessionStart check flags our templates (by their text) that lack the context-budget rule | `haiku_window_test` 17/17 |
+| No official eval covered the guard | — | `scout-stops-at-context-budget`, `scout-answers-at-turn-limit` | 2/2 + 3/3, 9/9 |
+| `scout-runs-full-order` was flaky | A/B on 4 runs each: original scout prompt 2/4, current 4/4; the failing answers were correct (all three files with line numbers), and the Haiku LLM judge split FAIL FAIL PASS | Exact-line regex graders replace the LLM judge (`OrdersController.cs:9-11`, `OrderService.cs:8`, `ShopDbContext.cs:13`) | 4/4 |
+
+Still open, by design or low value (all four resolved in §17):
+- A main Haiku session's MCP results (up to 25K tokens) aren't limited, so near compaction one could push the compaction request just past 100K. MCP output can't be asked to shrink, and this marketplace routes MCP through `publisher`, a subagent the budget covers.
+- The Haiku-window check reads user, project and local settings files only. A window passed with `--settings` or in managed settings gets a false "not set" note, and the main-session read rule stays off (fail-open).
+- The dotnet, postgresql and sqlserver evals still use LLM judges for some graders (e.g. `cites-code`, `triage-correct`), with the same flakiness risk.
+- `dotnet:guide` has `paths:` and `disable-model-invocation: true` together. The `paths:` gate is dead: the skill loads only through `/dotnet:guide`.
+
+## 17. The four open items, resolved (2026-10-18)
+
+| Item | Fix | Verified |
+|---|---|---|
+| MCP results in a main Haiku session weren't limited | The main-session rule covers every tool. MCP is estimated at `MAX_MCP_OUTPUT_TOKENS` (default 25K). A Read gets a line range, Bash `\| head -n 100` (a command already ending in `\| head/tail -n N` is estimated from N, so the retry passes), and MCP or other tools a subagent. Agent is never denied. If the last request is already past ~85K, compaction isn't running, so the guard allows instead of denying every call. | `haiku_guard_test` 29/29 |
+| The window check saw only the three settings files | It also reads the session's `--settings` (inline JSON, a file path, or `--settings=`), from the nearest `claude` process's argv: exact via `/proc` on Linux/WSL, best-effort via `ps` on macOS. An outer claude's flags are ignored. It also reads `managed-settings.json` plus `managed-settings.d/*.json` in the system directory and the cached server-managed `~/.claude/remote-settings.json`, in precedence order. MDM profiles and the Windows registry are still not read. | `haiku_window_test` 25/25; live: no note with `--settings` as a file or inline, note without |
+| LLM judges in the dotnet/postgresql evals | `pr-comments` triage: 7 row-level regexes on the gate table (path:line + class cell). pg gate: 3 regexes (unused index kept and never in a `DROP INDEX`, orphans never set to NULL on a NOT NULL column). analyze: `tool_used: Write` input matches (the old `focus: {file: glob}` grader **threw on every run**, because file targets don't take globs). brainstorm: matrix, recommendation and `options=` regexes, plus one LLM grader kept for "options differ in kind", run with `--judge-model sonnet`. Each new grader was checked against a real passing output, and mutation-tested to FAIL when its fact was broken (10/10). | analyze 2/2, brainstorm 2/2, pr-comments 2/2, pg gate 4/4 |
+| `dotnet:guide` `paths:` | Measured: a `paths:` skill adds 0 tokens at session start, but on 2.1.302 it never entered the skill listing, even after `.cs` files were read (comma-string and YAML-list forms, 2 Sonnet + 2 Haiku runs). Removed as dead config. `implement` and `review` already read the guide's references directly. | — |
+
+Found while doing this: the fake `psql` had no answers for the verification queries `schema-fix.md` prescribes (columns, sizes, index definitions, time zone, date ranges). Sonnet then inspected the stub and in one run refused to reach the gate, which made the pg gate case flaky. It now answers each statement in a `-c` in `psql -A -F'|'` shape, with the label column the skill's queries use, and returns no rows (not a "no canned answer" message) for anything else. Pg gate 4/4 with no run mentioning a stub; `schema-fix-writes-safe-scripts` 2/2; `fakebin_test` 29/29. A `controller` regex in `scout-runs-full-order` was too narrow (a correct answer cited `OrdersController.cs:8-10`); it now accepts lines 8-12 or a range ending there, 4/4.
+
+## 18. Real-repo test: eShopOnWeb with planted bugs (2026-10-18)
+
+Setup (`evals/realrepo/`): eShopOnWeb at `4da8212` (.NET 8, 10 projects, 254 `.cs` files) with four bugs on `feature/checkout-tweaks`: B1 `AddQuantity`→`SetQuantity`, B2 removed null guard, B3 SQL injection via `SqlQueryRaw` + interpolation, B4 `.Result` on async. Sonnet 5.5 main, the `/core:setup` settings, core + dotnet plugins, a clean environment, a fresh worktree per run. **The sandbox's network policy blocks `api.nuget.org`**, so nothing restored: build and test paths were exercised only up to the restore failure.
+
+| Run | Result | Cost (Haiku share) |
+|---|---|---|
+| `/dotnet:review main` | **4/4 planted bugs**, ranked, correct fixes; read `RESTORE FAILED` as "network, not code" | $0.080 ($0.0008) |
+| `/dotnet:debug <NRE trace>` | root cause B2 + the right commit + the fix + a regression test, plus B3 and B4 flagged | $0.150 → $0.101 after the fixes below |
+| plain bug report (B1), no slash command | right cause, line and commit from 2 inline `git` commands (Claude Code's recent-commits context gave the commit away) | $0.046 |
+| `/dotnet:build test` | forked into the Haiku runner, `RESTORE FAILED` | $0.001 |
+| `/dotnet:implement --no-tdd` fix B3 | correct `SqlQuery` fix; step gate blocked and honestly reported, nothing claimed green | $0.061 |
+| `/dotnet:audit` | `AUDIT INCOMPLETE` reported as not checked; .NET 8 end of support (2026-11-10) flagged; secret locations only | $0.051 |
+| `/dotnet:plan` 10-unit cap | grounded plan; found B1 as a prerequisite | $0.115 ($0.005) |
+| Haiku main session, whole-repo overview | 4 parallel scouts, no compaction, max prompt 40K; 38/43 citations exact (the rest were parser artifacts or ambiguous) | $0.040 |
+| repo-wide "every place quantity is read or changed" | ~20 correct locations; scout dispatched 4/4 after G8 (0/1 before), cost $0.082–0.120 vs $0.092 inline | — |
+
+Gaps found while running, and fixed:
+| # | Gap | Fix |
+|---|---|---|
+| G1 | A NuGet restore failure was reported as `BUILD FAILED`, inviting code "fixes" | Restore is its own step: `RESTORE FAILED (package source unreachable: <url>) - a network or feed problem, not a code error` |
+| G2 | An unreachable feed took **4m44s** to fail (NuGet retries) | One retry (`NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT=2` unless set): 1m06s |
+| G3 | The Steps check counted only `Read` calls for `verified=`, so verification through `sed`/`grep`/`git show` was falsely blocked, and **the final message became the hook correction instead of the RCA** | Shell reads (sed/cat/head/tail/grep/git show…) and Grep content count |
+| G4 | **Scout citations off by one**: `Read` with `offset: 0` numbers lines from 0 | PreToolUse rewrites `offset: 0` to `1` via `updatedInput` (no permission decision), for every model |
+| G5 | The Steps check missed false claims when the final message wasn't in the transcript yet (R1: claimed `verified=3` with 0 reads, not caught) | Reads the Steps line from the Stop hook's `last_assistant_message` |
+| G6 | The runner re-ran `dotnet.sh` after `RESTORE FAILED` (network looked "transient"): a minute wasted | A script that printed a `STATUS:` line has finished; never re-run it |
+| G7 | **`dotnet.sh audit` reported `vulnerable: 0` when it couldn't restore**: a false clean security result | Collects first; `STATUS: AUDIT INCOMPLETE (not checked: …) - do not report these as clean`, per-check `NOT CHECKED (reason)`; the audit skill reports them as not checked |
+| G8 | A repo-wide lookup stayed inline because the policy said "inline for a single Grep" | Scout for results spanning more than ~3 files "even when one repo-wide Grep would find them"; inline only for 1-3 known files |
+| G10 | After delegating, the main session sometimes re-ran the scout's whole search (R6b: $0.120) | Policy: open the 1-2 decisive refs, don't re-run the executor's search ($0.089 ×2 after) |
+
+Observations, not changed:
+- `/dotnet:implement` ran its step gate with `dotnet.sh` inline rather than through `core:runner`, and wrote `runner-checks=1`. The script output is pre-condensed, so the cost is the same (§11), but the key name over-claims.
+- For one lookup on a repo this size, delegation is cost-neutral ($0.089 vs $0.092). It keeps the main context smaller (26K vs 29K), which pays off over a longer session.
+- My planted commit messages were too telling: Claude Code's recent-commit context let the plain-prompt run find B1 from the history alone. Plant with neutral messages to test code reasoning.
+- Not exercised: anything after a successful restore (TDD red/green, coverage, test-failure condensing on a real suite), `/dotnet:pr` and `/dotnet:pr-comments` on a real GitHub PR, `/dotnet:ci`, `postgresql` and `sqlserver` against a live database.
+
+## 19. Regression check against main (2026-10-18)
+
+The question: does anything that works on `main` stop working with this branch?
+
+- **main's own tests on this branch's plugins** (main's `evals/` with this branch's `plugins/`): `guard_test` 57/57, `steps_check_test` 15/15 (through the fallback for older Claude Code without `last_assistant_message`), `frontmatter_test` 107/107.
+- **A/B on the shipped cases this branch hadn't run before** (same case, `main` checkout vs this branch, fresh runs):
+  - `flow-gates-after-analyze`: main **1/3**, branch **3/3**. Main's failures stopped to ask questions before showing the Approve / Revise / Pause gate.
+  - `sqlserver schema-fix-writes-safe-scripts`: main 2/3, branch 2/2 completed (a third run hit the account's usage limit). The `no-nocheck-fk` failure happens on main too. It flags a `WITH NOCHECK` in the down script, which restores the original untrusted FK, so the grader is arguably too broad. `plugins/sqlserver` is unchanged by this branch.
+- **Permissions:** the `offset: 0` → `1` rewrite returns `updatedInput` without a permission decision. A read outside the project still needs permission (denied in `-p`, the same with and without the plugin); a read inside is numbered from 1.
+
+Found and fixed in the process:
+| Risk | Fix |
+|---|---|
+| The branch exported `NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT=2` for the whole script, so a flaky network that `main` recovers from by retrying could fail, and the runner no longer re-runs a `STATUS` script | The first restore runs without retries. Only a definitive answer (401/403/407, DNS, refused) stops there; anything possibly transient re-runs with NuGet's normal retries, exactly as `main`. No script-wide override; a user's own setting wins. Blocked feed: 16s (main 4m44s) |
+| Hook launchers `exec`'d Python, so a crash exiting 2 passed through, and **exit 2 from a hook blocks the tool call or stop it guards**. A bare relative path made the launcher look for `<script>.sh/<file>.py` and exit 2. `main`'s `steps-check.sh` has the same flaw | All three launchers resolve their directory for relative paths and always exit 0 |
+| With `last_assistant_message` present but no Steps line, the check fell back to a lagging transcript that could still hold an older Steps line | The field, when present, is the final message; the transcript is the fallback only for older Claude Code |
+
+New free tests: `evals/hooks_failopen_test.sh` (39: no Python, malformed input, missing transcript, relative path, a Python exit 2), and `dotnet_sh_test.sh` grew to 17 (definitive vs transient restore failures).
+
+Hook cost per tool call: about 45 ms (Python start-up) for `haiku-guard` on every tool, plus `guard.sh` on Bash as before. Not tested here: Windows Git Bash and macOS (`ps` instead of `/proc` for `--settings`).

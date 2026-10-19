@@ -1,6 +1,6 @@
 ---
 name: setup
-description: One-time cost setup for this marketplace - Haiku defaults, Explore on Haiku, and the isolated publisher agent for Confluence/Jira/GitHub.
+description: One-time cost setup for this marketplace - Haiku defaults, a Haiku-only auto-compact window under 100K, Explore on Haiku, and the isolated publisher agent for Confluence/Jira/GitHub.
 disable-model-invocation: true
 ---
 # Marketplace cost setup
@@ -8,9 +8,16 @@ disable-model-invocation: true
 Apply each change below only after showing the user exactly what will change and getting a yes (use AskUserQuestion, one question per change, "skip" allowed). Before editing any existing file, copy it to `<file>.bak-<yyyymmdd>`. Never print tokens, header values, or other secrets: refer to them as `<redacted>`. Skip a step that is already in place and say so. Finish with a summary table: change | status (applied / already set / skipped).
 
 ## 1. User settings (`~/.claude/settings.json`)
-Merge `{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "haiku" } }`, keeping every other key. Subagents without their own model pin then run on Haiku.
-
-No compaction setting is needed: Claude Code already compacts Haiku (main and subagents) at ~95-100K, so no Haiku request crosses 100K (verified on 2.1.295, see RESEARCH.md §12).
+Merge both, keeping every other key (and every other model's entry under `modelSettings`):
+```json
+{
+  "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "haiku" },
+  "modelSettings": { "haiku": { "autoCompactWindow": 100000 } }
+}
+```
+- `CLAUDE_CODE_SUBAGENT_MODEL`: subagents without their own model pin run on Haiku.
+- `modelSettings.haiku.autoCompactWindow`: Haiku 5.5 bills prompts over 100K tokens at 5x, and Claude Code otherwise lets Haiku run to ~967K before compacting. With this, Haiku main sessions and subagents compact at ~72-80K, and other models keep their own windows (RESEARCH.md §14). If an existing `claude-haiku-*` entry under `modelSettings` has an `autoCompactWindow` above 100000, set it to 100000 too.
+- If `CLAUDE_CODE_AUTO_COMPACT_WINDOW` is set (`echo $CLAUDE_CODE_AUTO_COMPACT_WINDOW`, or in the `env` block of any settings file), tell the user: it overrides the per-model window for every model, so remove it unless they want every model compacting at that size.
 
 ## 2. Explore on Haiku
 Copy `${CLAUDE_PLUGIN_ROOT}/templates/Explore.md` to `~/.claude/agents/Explore.md`. If that file exists and differs, show the diff and ask before replacing it.
