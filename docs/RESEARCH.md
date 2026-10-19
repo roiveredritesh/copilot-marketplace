@@ -638,3 +638,24 @@ Observations, not changed:
 - For one lookup on a repo this size, delegation is cost-neutral ($0.089 vs $0.092). It keeps the main context smaller (26K vs 29K), which pays off over a longer session.
 - My planted commit messages were too telling: Claude Code's recent-commit context let the plain-prompt run find B1 from the history alone. Plant with neutral messages to test code reasoning.
 - Not exercised: anything after a successful restore (TDD red/green, coverage, test-failure condensing on a real suite), `/dotnet:pr` and `/dotnet:pr-comments` on a real GitHub PR, `/dotnet:ci`, `postgresql` and `sqlserver` against a live database.
+
+## 19. Regression check against main (2026-10-18)
+
+The question: does anything that works on `main` stop working with this branch?
+
+- **main's own tests on this branch's plugins** (main's `evals/` with this branch's `plugins/`): `guard_test` 57/57, `steps_check_test` 15/15 (through the fallback for older Claude Code without `last_assistant_message`), `frontmatter_test` 107/107.
+- **A/B on the shipped cases this branch hadn't run before** (same case, `main` checkout vs this branch, fresh runs):
+  - `flow-gates-after-analyze`: main **1/3**, branch **3/3**. Main's failures stopped to ask questions before showing the Approve / Revise / Pause gate.
+  - `sqlserver schema-fix-writes-safe-scripts`: main 2/3, branch 2/2 completed (a third run hit the account's usage limit). The `no-nocheck-fk` failure happens on main too. It flags a `WITH NOCHECK` in the down script, which restores the original untrusted FK, so the grader is arguably too broad. `plugins/sqlserver` is unchanged by this branch.
+- **Permissions:** the `offset: 0` → `1` rewrite returns `updatedInput` without a permission decision. A read outside the project still needs permission (denied in `-p`, the same with and without the plugin); a read inside is numbered from 1.
+
+Found and fixed in the process:
+| Risk | Fix |
+|---|---|
+| The branch exported `NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT=2` for the whole script, so a flaky network that `main` recovers from by retrying could fail, and the runner no longer re-runs a `STATUS` script | The first restore runs without retries. Only a definitive answer (401/403/407, DNS, refused) stops there; anything possibly transient re-runs with NuGet's normal retries, exactly as `main`. No script-wide override; a user's own setting wins. Blocked feed: 16s (main 4m44s) |
+| Hook launchers `exec`'d Python, so a crash exiting 2 passed through, and **exit 2 from a hook blocks the tool call or stop it guards**. A bare relative path made the launcher look for `<script>.sh/<file>.py` and exit 2. `main`'s `steps-check.sh` has the same flaw | All three launchers resolve their directory for relative paths and always exit 0 |
+| With `last_assistant_message` present but no Steps line, the check fell back to a lagging transcript that could still hold an older Steps line | The field, when present, is the final message; the transcript is the fallback only for older Claude Code |
+
+New free tests: `evals/hooks_failopen_test.sh` (39: no Python, malformed input, missing transcript, relative path, a Python exit 2), and `dotnet_sh_test.sh` grew to 17 (definitive vs transient restore failures).
+
+Hook cost per tool call: about 45 ms (Python start-up) for `haiku-guard` on every tool, plus `guard.sh` on Bash as before. Not tested here: Windows Git Bash and macOS (`ps` instead of `/proc` for `--settings`).
