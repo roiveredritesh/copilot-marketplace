@@ -10,7 +10,7 @@ Read only the reference that matches the task:
 | Task | Read |
 |---|---|
 | EF Core queries, LINQ translation, paging, N+1, tracking, bulk writes, migrations, DbContext lifetime, raw SQL | [efcore.md](efcore.md) |
-| ASP.NET Core: DI lifetimes, middleware order, HttpClient, options, auth, errors | [aspnetcore.md](aspnetcore.md) |
+| ASP.NET Core: DI lifetimes, middleware order, exception handling and ProblemDetails, HttpClient, options, validation, auth | [aspnetcore.md](aspnetcore.md) |
 | async/await pitfalls, allocations, collections, hot paths | [csharp-perf.md](csharp-perf.md) |
 
 Rules that always apply:
