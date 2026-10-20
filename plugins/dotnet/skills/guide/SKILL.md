@@ -9,7 +9,7 @@ Read only the reference that matches the task:
 
 | Task | Read |
 |---|---|
-| EF Core queries, N+1, tracking, migrations, DbContext lifetime, raw SQL | [efcore.md](efcore.md) |
+| EF Core queries, LINQ translation, paging, N+1, tracking, bulk writes, migrations, DbContext lifetime, raw SQL | [efcore.md](efcore.md) |
 | ASP.NET Core: DI lifetimes, middleware order, HttpClient, options, auth, errors | [aspnetcore.md](aspnetcore.md) |
 | async/await pitfalls, allocations, collections, hot paths | [csharp-perf.md](csharp-perf.md) |
 

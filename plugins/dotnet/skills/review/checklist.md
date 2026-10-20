@@ -16,6 +16,8 @@ Check what the diff touches; skip sections that don't apply.
 
 ## Data access (EF Core, Dapper, ADO.NET)
 - Queries in loops (N+1); `ToList()` before `Where` (filtering in memory); missing `AsNoTracking()` on read-only queries.
+- `Func<T,bool>` / `IEnumerable<T>` where an `Expression<>` / `IQueryable<T>` was needed (silent in-memory filtering); list endpoints without server-side paging or with an unclamped page size; `Skip`/`Take` without a unique `OrderBy`.
+- `ExecuteUpdateAsync`/`ExecuteDeleteAsync` where auditing, soft delete, or domain events rely on `SaveChanges`; EF Core APIs newer than the project's EF version (or EF Core APIs in an EF6 project).
 - String-concatenated SQL (injection). `FromSqlRaw` with interpolation must be `FromSqlInterpolated`/parameters.
 - New queries on large tables without an index; migrations that lock big tables (see the postgresql plugin's migration-safety notes).
 - `DbContext` lifetime: never singleton, never shared across threads.
