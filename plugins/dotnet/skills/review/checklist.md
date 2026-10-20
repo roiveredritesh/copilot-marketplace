@@ -7,6 +7,7 @@ Check what the diff touches; skip sections that don't apply.
 - Off-by-one, inverted conditions, missing `else`/`default` branches, swallowed exceptions (`catch { }`, `catch (Exception) { return null; }`).
 - `DateTime.Now` vs `UtcNow`; `DateTime.Kind` mixing; culture-sensitive parse/format (`ToString()`/`Parse` without `CultureInfo.InvariantCulture` for machine data).
 - Equality: `==` on strings with different casing rules, floating-point equality, `GetHashCode` overridden without `Equals`.
+- Exceptions: `throw ex;` (loses the stack trace); per-action try/catch that duplicates the global handler; exceptions used for not-found or validation; an exception logged in both the handler and the middleware, or by neither (.NET 10 changed this); `OperationCanceledException` from an aborted request reported as a 500.
 
 ## Async and concurrency
 - `.Result`, `.Wait()`, `GetAwaiter().GetResult()` on async code (deadlock risk in classic ASP.NET / UI contexts; thread-pool starvation in ASP.NET Core).
@@ -25,6 +26,7 @@ Check what the diff touches; skip sections that don't apply.
 ## Security
 - Secrets, connection strings, or tokens in code or committed config.
 - Missing `[Authorize]` / policy on new endpoints; authorization checked on the client only; IDOR (resource ids not scoped to the caller).
+- Request models bound straight to EF entities (over-posting); exception messages, stack traces, or SQL returned in error responses; `AllowAnyOrigin()` with credentials.
 - Unvalidated input reaching file paths, SQL, shell, redirects, or deserialization (`TypeNameHandling`, `BinaryFormatter`).
 - Sensitive data in logs.
 
