@@ -16,7 +16,7 @@ You (the main session) do the judging. Haiku agents only fetch and run things. K
 ## 2. Dispatch in ONE message (parallel)
 - `core:runner`, work order: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/dotnet.sh" test` → return the output as printed. Skip it for a remote PR not checked out locally.
 - Only if the diff is **over 600 changed lines**: split the changed files into chunks of about 400 lines (keep a file's tests with it) and give each chunk to `core:reviewer` (at most 4) with the base ref. You then review only cross-file concerns.
-  Dispatch a chunk at effort `high` when it touches authentication or authorization, payments, concurrency or locking, or migrations; leave the other chunks at the agent's default (`medium`). Don't raise `core:scout` or `core:runner` effort: they only fetch and run, and you do the judging.
+  Dispatch a chunk at effort `high` when it touches authentication or authorization, payments, concurrency or locking, or migrations; leave the other chunks at the agent's default (`medium`). Leave `core:scout` and `core:runner` at their default: they only fetch and run, and you do the judging.
 
 ## 3. Review (diff ≤ 600 lines, or cross-file concerns)
 Read the diff file by file (`git diff $MB -- <file>`). Open surrounding code only when the hunk alone isn't enough. Apply [checklist.md](checklist.md). For EF Core, ASP.NET Core, or hot-path/async changes, also read the matching file from `${CLAUDE_PLUGIN_ROOT}/skills/guide/` (`efcore.md`, `aspnetcore.md`, `csharp-perf.md`).

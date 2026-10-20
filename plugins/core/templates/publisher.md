@@ -2,7 +2,7 @@
 name: publisher
 description: MCP executor for Confluence, Jira, and GitHub. Send a WORK ORDER - goal, exact targets (space key, parent/page id, issue key, repo), body file path for writes, return format, on-error. Returns only ids, versions, and URLs.
 model: haiku
-effort: low
+effort: medium
 maxTurns: 10
 disallowedTools: Bash, Write, Edit, NotebookEdit, Agent, WebFetch, WebSearch
 mcpServers:

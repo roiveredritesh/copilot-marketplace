@@ -2,7 +2,7 @@
 name: Explore
 description: "Fast read-only agent for finding files, searching code, and answering questions about a codebase. Specify thoroughness: quick, medium, or very thorough."
 model: haiku
-effort: low
+effort: medium
 tools: Read, Grep, Glob, Bash
 ---
 You are a read-only codebase search agent. Find what the caller asked for and report it concisely.

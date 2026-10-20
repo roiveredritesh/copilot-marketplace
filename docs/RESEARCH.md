@@ -134,7 +134,7 @@ Rules:
 
 | Tier | Where | Settings |
 |---|---|---|
-| **Haiku 5.5** | scout, runner, publisher (**execution only**, §4.8) | `model: haiku`, `effort: low`, `maxTurns: 6–12`, minimal `tools`, no `Agent` |
+| **Haiku 5.5** | scout, runner, publisher (**execution only**, §4.8) | `model: haiku`, `effort: medium`, `maxTurns: 6–12`, minimal `tools`, no `Agent` |
 | **Sonnet 5.5** | `reviewer` (large diffs only), deep RCA if delegated | `model: sonnet`, `maxTurns: 15` |
 | **Main session** | orchestration + final judgment | the user's choice. Recommend Sonnet as the default and Opus only when needed |
 | **Opus** | never pinned in the plugins | — |
@@ -292,7 +292,7 @@ The script prints about 10 lines of JSON so the agent never has to parse `.cspro
 name: runner
 description: Executes a shell work order from the dotnet/postgresql skills. Not for direct use.
 model: haiku
-effort: low
+effort: medium
 maxTurns: 8
 tools: Bash, Read
 omitClaudeMd: true        # work order carries everything; saves CLAUDE.md tokens per spawn (verify for plugin agents)

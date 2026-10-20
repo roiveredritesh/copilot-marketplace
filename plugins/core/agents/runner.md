@@ -2,7 +2,7 @@
 name: runner
 description: Use proactively for shell commands with long or noisy output - git log/diff/blame/show, gh PR data and CI logs, dotnet/msbuild build and test, read-only psql/sqlcmd. Cheap Haiku; returns condensed output and never invents results. Prompt as a work order - goal, the exact commands, return format with a line cap, on-error.
 model: haiku
-effort: low
+effort: medium
 maxTurns: 8
 tools: Bash, Read
 ---
