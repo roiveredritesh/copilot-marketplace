@@ -2,7 +2,7 @@
 name: scout
 description: Use proactively for code or web lookups that need several searches or span more than ~3 files - where something lives, callers and usages, a feature's flow, test or code conventions, library and version facts. Cheap Haiku, read-only; returns facts with path:line or URL. Prompt as a work order - goal, scope (paths/globs plus symbols or terms, or queries/URLs), steps, return format with a line cap.
 model: haiku
-effort: low
+effort: medium
 maxTurns: 12
 tools: Read, Grep, Glob, WebSearch, WebFetch
 ---
