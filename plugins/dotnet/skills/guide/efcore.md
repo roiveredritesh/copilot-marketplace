@@ -16,19 +16,19 @@
 ## LINQ translation
 - Untranslatable expressions throw (EF 3+) unless they sit in the final `Select`. Rewrite them in a translatable form; don't add `AsEnumerable()`/`ToList()` earlier to make the error go away.
 - Keep `IQueryable<T>` and `Expression<Func<T, bool>>` in repository and helper signatures. A `Func<T, bool>` predicate or an `IEnumerable<T>` parameter binds to `Enumerable.Where` and filters in memory after loading the table.
-- String comparisons: `string.Equals(a, b, StringComparison.X)` doesn't translate. `x.Name.ToLower() == s` translates but can't use an index. Rely on the column collation, or use `EF.Functions.Collate` (EF 5+) or `EF.Functions.ILike` (Npgsql).
+- String comparisons: `string.Equals(a, b, StringComparison.X)` doesn't translate. `x.Name.ToLower() == s` translates but can't use a plain index on the column. Rely on the column collation, or use `EF.Functions.Collate` (EF 5+) or `EF.Functions.ILike` (Npgsql).
 - `list.Contains(x.Id)` becomes `IN`. On SQL Server, EF 8 and 9 send the list as one JSON parameter (`OPENJSON`), which needs compatibility level 130 or higher; on older databases configure `UseCompatibilityLevel(120)`.
 - Query plans are cached by expression shape. Use variables, not values spliced into dynamically built expressions, so EF parameterizes them.
 
 ## Pagination
-- Every list endpoint pages on the server. Clamp the client's page size to a server-side maximum, and reject `page < 1`.
+- Every list endpoint pages on the server, unless the list is small and bounded (a lookup table). Clamp the client's page size to a server-side maximum, and reject `page < 1`.
 - `Skip`/`Take` need an `OrderBy` with a unique key (add `.ThenBy(x => x.Id)` as a tie-breaker), or rows repeat or vanish between pages. EF logs a warning when the `OrderBy` is missing.
 - Default shape: `Where` → `OrderBy` → `Skip`/`Take` → `Select` → `ToListAsync`.
 
 ## N+1 and includes
 - Symptom: one query per row in the logs. Without lazy loading (off by default in EF Core), an unloaded navigation is `null`, not an extra query. N+1 comes from lazy-loading proxies, explicit `Entry(x).Reference(...).LoadAsync()`, or a query inside a loop.
 - Fix: `Include`/`ThenInclude`, or a projection (preferred when only some fields are needed). Filtered includes (`Include(x => x.Items.Where(...))`, EF 5+) load part of a collection.
-- With two or more collection includes, use `AsSplitQuery()` (EF 5+) to avoid a cartesian explosion; set `UseQuerySplittingBehavior` globally if it's common. One collection include is fine as a single query. Split queries run several round trips and aren't a consistent snapshot unless they run in a serializable or snapshot transaction.
+- With two or more collection includes, use `AsSplitQuery()` (EF 5+) to avoid a cartesian explosion; set `UseQuerySplittingBehavior` globally if it's common. One collection include is usually fine as a single query. Split queries run several round trips and aren't a consistent snapshot unless they run in a serializable or snapshot transaction.
 - Disable lazy loading unless there's a clear reason to keep it. In Web APIs, load related data explicitly.
 
 ## Writes
@@ -46,7 +46,7 @@
 - Compiled queries (`EF.CompileAsyncQuery`) only for a hot path where measurement shows translation cost matters. EF already caches translated queries.
 
 ## Raw SQL
-- `FromSql($"... {param}")` (EF 7+), `FromSqlInterpolated`, and `SqlQuery<T>` are parameterized. `FromSqlRaw` with string concatenation is SQL injection.
+- `FromSql($"... {param}")` (EF 7+), `FromSqlInterpolated`, and `Database.SqlQuery<T>` (EF 7+ scalars, EF 8+ unmapped types) are parameterized. `FromSqlRaw` with string concatenation is SQL injection.
 
 ## DbContext lifetime
 - Scoped (one per request). Never a singleton, never shared across threads or parallel tasks. For background work, use `IDbContextFactory<T>` and create one per unit of work.
